@@ -1,11 +1,17 @@
 import io
+import datetime
 import numpy as np
 import pandas as pd
 import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 st.set_page_config(page_title="PTM Charge Input", layout="wide")
 
-charge_range = "−2…+2" if st.session_state.get('charge_system', '5-state') == "5-state" else "−5…+5"
+current_min = st.session_state.get('min_charge', -2)
+current_max = st.session_state.get('max_charge', 2)
+charge_range = f"{current_min:+d}…{current_max:+d}" if current_min < 0 else f"0…{current_max:+d}"
 st.title(f"PTM Charge Variant Input ({charge_range})")
 st.caption("Enter any number of PTM sites, copies per site, and charge probabilities. Row sums must equal 1. Then compute the overall charge distribution.")
 
@@ -50,15 +56,65 @@ with st.expander("📚 How to use this tool", expanded=False):
 # -------------------------------
 # Data-entry (Task 1 & 2)
 # -------------------------------
-# Support both 5-state and 11-state charge systems
-DEFAULT_COLS_5 = ["Site_ID", "Copies", "P(-2)", "P(-1)", "P(0)", "P(+1)", "P(+2)"]
-DEFAULT_COLS_11 = ["Site_ID", "Copies", "P(-5)", "P(-4)", "P(-3)", "P(-2)", "P(-1)", "P(0)", "P(+1)", "P(+2)", "P(+3)", "P(+4)", "P(+5)"]
+# Function to generate column names for any charge range
+def generate_charge_columns(min_charge, max_charge):
+    """Generate column names for a given charge range."""
+    base_cols = ["Site_ID", "Copies"]
+    charge_cols = []
+    for charge in range(min_charge, max_charge + 1):
+        if charge == 0:
+            charge_cols.append("P(0)")
+        elif charge > 0:
+            charge_cols.append(f"P(+{charge})")
+        else:
+            charge_cols.append(f"P({charge})")
+    return base_cols + charge_cols
 
-# Auto-detect charge system based on session state or use 5-state as default
+# Function to auto-detect charge system from existing data
+def auto_detect_charge_system(df):
+    """Auto-detect the charge system from DataFrame columns."""
+    if df is None or len(df) == 0:
+        return "5-state", -2, 2
+    
+    prob_cols = [col for col in df.columns if col.startswith("P(")]
+    if not prob_cols:
+        return "5-state", -2, 2
+    
+    charges = []
+    for col in prob_cols:
+        charge_str = col[2:-1]  # Extract charge from P(charge) format
+        try:
+            if charge_str.startswith('+'):
+                charges.append(int(charge_str[1:]))
+            elif charge_str.startswith('-'):
+                charges.append(-int(charge_str[1:]))
+            else:
+                charges.append(int(charge_str))
+        except ValueError:
+            continue
+    
+    if not charges:
+        return "5-state", -2, 2
+    
+    min_charge = min(charges)
+    max_charge = max(charges)
+    range_size = max_charge - min_charge + 1
+    
+    # Generate system name
+    system_name = f"{range_size}-state"
+    return system_name, min_charge, max_charge
+
+# Initialize charge system
 if "charge_system" not in st.session_state:
-    st.session_state.charge_system = "5-state"  # Default to 5-state
+    st.session_state.charge_system = "5-state"
+    st.session_state.min_charge = -2
+    st.session_state.max_charge = 2
 
-DEFAULT_COLS = DEFAULT_COLS_5 if st.session_state.charge_system == "5-state" else DEFAULT_COLS_11
+# Generate default columns based on current charge system
+if hasattr(st.session_state, 'min_charge') and hasattr(st.session_state, 'max_charge'):
+    DEFAULT_COLS = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
+else:
+    DEFAULT_COLS = generate_charge_columns(-2, 2)  # fallback
 if "df" not in st.session_state:
     st.session_state.df = pd.DataFrame(
         [
@@ -71,36 +127,91 @@ if "df" not in st.session_state:
 with st.sidebar:
     st.header("Data Input Options")
     
-    # Charge system selector
+    # Charge system selector with more options
     st.subheader("⚙️ Charge System")
-    charge_system = st.radio(
+    
+    # Enhanced charge system options
+    charge_options = {
+        "3-state (-1 to +1)": ("3-state", -1, 1),
+        "5-state (-2 to +2)": ("5-state", -2, 2), 
+        "7-state (-3 to +3)": ("7-state", -3, 3),
+        "9-state (-4 to +4)": ("9-state", -4, 4),
+        "11-state (-5 to +5)": ("11-state", -5, 5),
+        "15-state (-7 to +7)": ("15-state", -7, 7),
+        "Auto-detect from data": ("auto", None, None)
+    }
+    
+    # Default selection based on current state
+    current_display = "5-state (-2 to +2)"  # default
+    for display_name, (system_name, _, _) in charge_options.items():
+        if system_name == st.session_state.charge_system:
+            current_display = display_name
+            break
+    
+    charge_system_selection = st.selectbox(
         "Select charge range:",
-        ["5-state (-2 to +2)", "11-state (-5 to +5)"],
-        index=0 if st.session_state.charge_system == "5-state" else 1,
+        list(charge_options.keys()),
+        index=list(charge_options.keys()).index(current_display),
         key="charge_system_selector",
-        help="5-state: Standard PTM analysis | 11-state: Extended range for stress testing"
+        help="Choose charge range or auto-detect from your data. Larger ranges support more extreme PTM scenarios."
     )
     
-    # Update charge system and columns
-    new_system = "5-state" if "5-state" in charge_system else "11-state"
-    if new_system != st.session_state.charge_system:
-        st.session_state.charge_system = new_system
-        DEFAULT_COLS = DEFAULT_COLS_5 if new_system == "5-state" else DEFAULT_COLS_11
+    selected_system, min_charge, max_charge = charge_options[charge_system_selection]
+    
+    # Handle auto-detection or system change
+    if selected_system == "auto":
+        # Auto-detect from current data
+        detected_system, detected_min, detected_max = auto_detect_charge_system(st.session_state.df)
+        new_system = detected_system
+        new_min_charge = detected_min
+        new_max_charge = detected_max
+        st.info(f"🔍 Auto-detected: {new_system} ({new_min_charge} to {new_max_charge})")
+    else:
+        new_system = selected_system
+        new_min_charge = min_charge
+        new_max_charge = max_charge
+    
+    # Update charge system if changed
+    if (new_system != st.session_state.charge_system or 
+        new_min_charge != getattr(st.session_state, 'min_charge', -2) or 
+        new_max_charge != getattr(st.session_state, 'max_charge', 2)):
         
-        # Reset dataframe when switching systems
-        if new_system == "5-state":
+        st.session_state.charge_system = new_system
+        st.session_state.min_charge = new_min_charge
+        st.session_state.max_charge = new_max_charge
+        
+        # Generate new default columns
+        DEFAULT_COLS = generate_charge_columns(new_min_charge, new_max_charge)
+        
+        # Reset dataframe when switching systems (only if not auto-detecting)
+        if selected_system != "auto":
+            # Create neutral and slightly charged examples
+            example_probs_1 = [0.0] * (new_max_charge - new_min_charge + 1)
+            example_probs_2 = [0.0] * (new_max_charge - new_min_charge + 1)
+            
+            # Set neutral (charge 0) to 1.0 for first site
+            neutral_index = -new_min_charge  # Index for charge 0
+            example_probs_1[neutral_index] = 1.0
+            
+            # Set balanced distribution for second site
+            if new_max_charge >= 1 and new_min_charge <= -1:
+                example_probs_2[neutral_index] = 0.6  # P(0) = 0.6
+                if neutral_index > 0:  # P(-1) = 0.2
+                    example_probs_2[neutral_index - 1] = 0.2
+                if neutral_index < len(example_probs_2) - 1:  # P(+1) = 0.2
+                    example_probs_2[neutral_index + 1] = 0.2
+            else:
+                example_probs_2[neutral_index] = 1.0
+            
             st.session_state.df = pd.DataFrame([
-                ["Site_1", 1, 0.0, 0.0, 1.0, 0.0, 0.0],
-                ["Site_2", 1, 0.0, 0.2, 0.6, 0.2, 0.0],
-            ], columns=DEFAULT_COLS_5)
-        else:
-            st.session_state.df = pd.DataFrame([
-                ["Site_1", 1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                ["Site_2", 1, 0.0, 0.0, 0.0, 0.0, 0.2, 0.6, 0.2, 0.0, 0.0, 0.0, 0.0],
-            ], columns=DEFAULT_COLS_11)
+                ["Site_1", 1] + example_probs_1,
+                ["Site_2", 1] + example_probs_2,
+            ], columns=DEFAULT_COLS)
+        
         st.rerun()
     
-    DEFAULT_COLS = DEFAULT_COLS_5 if st.session_state.charge_system == "5-state" else DEFAULT_COLS_11
+    # Update DEFAULT_COLS for current session
+    DEFAULT_COLS = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
     
     # File upload section
     st.subheader("📁 Upload CSV File")
@@ -115,20 +226,24 @@ with st.sidebar:
         try:
             uploaded_df = pd.read_csv(uploaded_file)
             
-            # Validate columns
-            required_cols = set(DEFAULT_COLS)
+            # Auto-detect charge system from uploaded file
             uploaded_cols = set(uploaded_df.columns)
+            detected_system, detected_min, detected_max = auto_detect_charge_system(uploaded_df)
             
-            if required_cols.issubset(uploaded_cols):
-                # Auto-detect charge system from uploaded file
-                if len(uploaded_cols.intersection(set(DEFAULT_COLS_11))) > len(uploaded_cols.intersection(set(DEFAULT_COLS_5))):
-                    detected_system = "11-state"
-                    st.session_state.charge_system = "11-state"
-                    DEFAULT_COLS = DEFAULT_COLS_11
-                    st.info("🔍 Detected 11-state charge system from uploaded file")
-                else:
-                    detected_system = "5-state"
-                    st.info("🔍 Detected 5-state charge system from uploaded file")
+            # Generate columns for detected system based on what we actually found
+            detected_cols = generate_charge_columns(detected_min, detected_max)
+            
+            # Check if all required columns exist in the uploaded file
+            if set(detected_cols).issubset(uploaded_cols):
+                # Update session state with detected system ONLY if we can successfully load
+                st.session_state.charge_system = detected_system
+                st.session_state.min_charge = detected_min
+                st.session_state.max_charge = detected_max
+                
+                # Update DEFAULT_COLS for current session
+                DEFAULT_COLS = detected_cols
+                
+                st.success(f"🔍 Detected {detected_system} charge system ({detected_min} to {detected_max}) from uploaded file")
                 
                 # Ensure numeric columns are properly typed
                 numeric_cols = ["Copies"] + [col for col in DEFAULT_COLS if col.startswith("P(")]
@@ -160,9 +275,10 @@ with st.sidebar:
                             st.rerun()
                     
             else:
-                missing_cols = required_cols - uploaded_cols
+                missing_cols = set(detected_cols) - uploaded_cols
                 st.error(f"Missing required columns: {', '.join(missing_cols)}")
-                st.info("Required columns: " + ", ".join(DEFAULT_COLS))
+                st.info("Expected columns for detected system: " + ", ".join(detected_cols))
+                st.info("Available columns in CSV: " + ", ".join(sorted(uploaded_cols)))
                 
         except Exception as e:
             st.error(f"Error reading CSV file: {str(e)}")
@@ -172,7 +288,21 @@ with st.sidebar:
     st.subheader("📝 Manual Entry Controls")
     add_rows = st.number_input("Add blank rows", min_value=0, max_value=100, value=0, step=1)
     if st.button("Insert", key="insert_blank_rows"):
-        new = pd.DataFrame([["", 1, 0, 0, 1, 0, 0] for _ in range(add_rows)], columns=DEFAULT_COLS)
+        # Create blank rows with correct number of columns for current charge system
+        current_min = st.session_state.get('min_charge', -2)
+        current_max = st.session_state.get('max_charge', 2)
+        charge_range = current_max - current_min + 1
+        neutral_index = -current_min
+        
+        # Create probability array with neutral charge = 1.0, others = 0.0
+        blank_probs = [0.0] * charge_range
+        blank_probs[neutral_index] = 1.0
+        
+        new_rows = []
+        for _ in range(add_rows):
+            new_rows.append(["", 1] + blank_probs)
+        
+        new = pd.DataFrame(new_rows, columns=DEFAULT_COLS)
         st.session_state.df = pd.concat([st.session_state.df, new], ignore_index=True)
         st.success(f"Added {add_rows} blank rows")
 
@@ -184,18 +314,57 @@ with st.sidebar:
     with template_col1:
         if st.button("📊 Generate N=100 template", key="generate_n100_template"):
             template_data = []
+            current_min = st.session_state.min_charge
+            current_max = st.session_state.max_charge
+            charge_range = current_max - current_min + 1
+            neutral_index = -current_min  # Index for charge 0
+            
             for i in range(1, 101):
                 site_id = f"Site_{i}"
                 copies = 1
+                probs = [0.0] * charge_range
                 
                 if i % 4 == 0:  # Neutral dominant
-                    probs = [0.0, 0.1, 0.8, 0.1, 0.0]
+                    probs[neutral_index] = 0.8  # P(0)
+                    if neutral_index > 0:  # P(-1) if available
+                        probs[neutral_index - 1] = 0.1
+                    if neutral_index < charge_range - 1:  # P(+1) if available
+                        probs[neutral_index + 1] = 0.1
+                        
                 elif i % 4 == 1:  # Slightly positive bias
-                    probs = [0.0, 0.0, 0.6, 0.3, 0.1]
+                    probs[neutral_index] = 0.6  # P(0)
+                    if neutral_index < charge_range - 1:  # P(+1) if available
+                        probs[neutral_index + 1] = 0.3
+                    if neutral_index < charge_range - 2:  # P(+2) if available
+                        probs[neutral_index + 2] = 0.1
+                    else:
+                        probs[neutral_index] += 0.1  # Add back to neutral if +2 not available
+                        
                 elif i % 4 == 2:  # Slightly negative bias
-                    probs = [0.1, 0.3, 0.6, 0.0, 0.0]
+                    probs[neutral_index] = 0.6  # P(0)
+                    if neutral_index > 0:  # P(-1) if available
+                        probs[neutral_index - 1] = 0.3
+                    if neutral_index > 1:  # P(-2) if available
+                        probs[neutral_index - 2] = 0.1
+                    else:
+                        probs[neutral_index] += 0.1  # Add back to neutral if -2 not available
+                        
                 else:  # Balanced
-                    probs = [0.05, 0.2, 0.5, 0.2, 0.05]
+                    probs[neutral_index] = 0.5  # P(0)
+                    remaining_prob = 0.5
+                    # Distribute remaining probability symmetrically
+                    for offset in range(1, min(3, neutral_index + 1, charge_range - neutral_index)):
+                        prob_each = remaining_prob / (2 * offset) if offset <= 2 else 0.05
+                        if neutral_index - offset >= 0:
+                            probs[neutral_index - offset] = prob_each
+                        if neutral_index + offset < charge_range:
+                            probs[neutral_index + offset] = prob_each
+                        remaining_prob -= 2 * prob_each
+                        if remaining_prob <= 0:
+                            break
+                    
+                    # Add any remaining probability back to neutral
+                    probs[neutral_index] += remaining_prob
                 
                 template_data.append([site_id, copies] + probs)
             
@@ -215,38 +384,72 @@ with st.sidebar:
         
         if st.button("Generate custom template", key="generate_custom_template"):
             template_data = []
+            current_min = st.session_state.min_charge
+            current_max = st.session_state.max_charge
+            charge_range = current_max - current_min + 1
+            neutral_index = -current_min  # Index for charge 0
+            
             for i in range(1, n_sites + 1):
                 site_id = f"Site_{i}"
                 copies = 1
+                probs = [0.0] * charge_range
                 
-                if st.session_state.charge_system == "5-state":
-                    if template_type == "Neutral sites only":
-                        probs = [0.0, 0.0, 1.0, 0.0, 0.0]  # All neutral
-                    elif template_type == "Acidic sites (negative)":
-                        probs = [0.2, 0.6, 0.2, 0.0, 0.0]  # Negative bias
-                    elif template_type == "Basic sites (positive)":
-                        probs = [0.0, 0.0, 0.2, 0.6, 0.2]  # Positive bias
-                    else:  # Mixed population
-                        if i % 3 == 0:
-                            probs = [0.1, 0.4, 0.5, 0.0, 0.0]  # Acidic
-                        elif i % 3 == 1:
-                            probs = [0.0, 0.0, 0.5, 0.4, 0.1]  # Basic
+                if template_type == "Neutral sites only":
+                    probs[neutral_index] = 1.0  # All neutral
+                    
+                elif template_type == "Acidic sites (negative)":
+                    # Distribute probability towards negative charges
+                    if current_min <= -2:
+                        probs[neutral_index + current_min] = 0.2  # Most negative
+                        if current_min <= -1:
+                            probs[neutral_index - 1] = 0.6  # P(-1)
+                        probs[neutral_index] = 0.2  # P(0)
+                    else:
+                        # If range doesn't go to -2, distribute available negative charges
+                        if current_min <= -1:
+                            probs[neutral_index - 1] = 0.8
+                            probs[neutral_index] = 0.2
                         else:
-                            probs = [0.0, 0.1, 0.8, 0.1, 0.0]  # Neutral
-                else:  # 11-state system
-                    if template_type == "Neutral sites only":
-                        probs = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # All neutral
-                    elif template_type == "Acidic sites (negative)":
-                        probs = [0.1, 0.2, 0.3, 0.2, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0]  # Negative bias
-                    elif template_type == "Basic sites (positive)":
-                        probs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.2, 0.3, 0.2, 0.1]  # Positive bias
-                    else:  # Mixed population
-                        if i % 3 == 0:
-                            probs = [0.05, 0.1, 0.2, 0.3, 0.25, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0]  # Acidic
-                        elif i % 3 == 1:
-                            probs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.25, 0.3, 0.2, 0.1, 0.05]  # Basic
+                            probs[neutral_index] = 1.0
+                            
+                elif template_type == "Basic sites (positive)":
+                    # Distribute probability towards positive charges
+                    if current_max >= 2:
+                        probs[neutral_index + 2] = 0.2  # P(+2)
+                        if current_max >= 1:
+                            probs[neutral_index + 1] = 0.6  # P(+1)
+                        probs[neutral_index] = 0.2  # P(0)
+                    else:
+                        # If range doesn't go to +2, distribute available positive charges
+                        if current_max >= 1:
+                            probs[neutral_index + 1] = 0.8
+                            probs[neutral_index] = 0.2
                         else:
-                            probs = [0.0, 0.0, 0.05, 0.1, 0.2, 0.3, 0.2, 0.1, 0.05, 0.0, 0.0]  # Neutral
+                            probs[neutral_index] = 1.0
+                            
+                else:  # Mixed population
+                    if i % 3 == 0:  # Acidic sites
+                        if current_min <= -1:
+                            probs[neutral_index - 1] = 0.4
+                            probs[neutral_index] = 0.5
+                            if current_min <= -2:
+                                probs[neutral_index - 2] = 0.1
+                        else:
+                            probs[neutral_index] = 1.0
+                    elif i % 3 == 1:  # Basic sites
+                        if current_max >= 1:
+                            probs[neutral_index + 1] = 0.4
+                            probs[neutral_index] = 0.5
+                            if current_max >= 2:
+                                probs[neutral_index + 2] = 0.1
+                        else:
+                            probs[neutral_index] = 1.0
+                    else:  # Neutral sites
+                        probs[neutral_index] = 0.8
+                        if current_min <= -1:
+                            probs[neutral_index - 1] = 0.1
+                        if current_max >= 1:
+                            probs[neutral_index + 1] = 0.1
                 
                 template_data.append([site_id, copies] + probs)
             
@@ -262,14 +465,25 @@ with st.sidebar:
 
 tabs = st.tabs(["📝 Input table", "🧮 Compute distribution"])
 
-# Show current dataset status with health check
+# Show current dataset and system status
 n_sites = len(st.session_state.df)
-prob_cols = [col for col in DEFAULT_COLS if col.startswith("P(")]
+# Get probability columns from actual DataFrame, not from DEFAULT_COLS
+actual_prob_cols = [col for col in st.session_state.df.columns if col.startswith("P(")]
 temp_df = st.session_state.df.copy()
-temp_df["Prob_Sum"] = temp_df[prob_cols].sum(axis=1)
-n_valid = sum(np.isclose(temp_df["Prob_Sum"].fillna(0), 1.0, atol=1e-6))
+if actual_prob_cols:  # Only calculate if there are probability columns
+    temp_df["Prob_Sum"] = temp_df[actual_prob_cols].sum(axis=1)
+    n_valid = sum(np.isclose(temp_df["Prob_Sum"].fillna(0), 1.0, atol=1e-6))
+else:
+    n_valid = 0
 
-status_col1, status_col2 = st.columns([3, 1])
+system_info_col, status_col1, status_col2 = st.columns([2, 3, 1])
+
+with system_info_col:
+    system_name = st.session_state.get('charge_system', '5-state')
+    min_charge = st.session_state.get('min_charge', -2)
+    max_charge = st.session_state.get('max_charge', 2)
+    st.info(f"⚙️ Current: **{system_name}** ({min_charge:+d} to {max_charge:+d})")
+
 with status_col1:
     if n_valid == n_sites:
         st.success(f"✅ Dataset ready: {n_sites} PTM sites, all valid")
@@ -278,23 +492,26 @@ with status_col1:
 
 with status_col2:
     if st.button("🔄 Reset to default", key="reset_data", help="Start over with 2 example sites"):
-        if st.session_state.charge_system == "5-state":
-            st.session_state.df = pd.DataFrame([
-                ["Site_1", 1, 0.0, 0.0, 1.0, 0.0, 0.0],
-                ["Site_2", 1, 0.0, 0.2, 0.6, 0.2, 0.0],
-            ], columns=DEFAULT_COLS_5)
-        else:
-            st.session_state.df = pd.DataFrame([
-                ["Site_1", 1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                ["Site_2", 1, 0.0, 0.0, 0.0, 0.0, 0.2, 0.6, 0.2, 0.0, 0.0, 0.0, 0.0],
-            ], columns=DEFAULT_COLS_11)
+        # Reset to 5-state system with examples
+        st.session_state.charge_system = "5-state"
+        st.session_state.min_charge = -2
+        st.session_state.max_charge = 2
+        
+        reset_cols = generate_charge_columns(-2, 2)
+        st.session_state.df = pd.DataFrame([
+            ["Site_1", 1, 0.0, 0.0, 1.0, 0.0, 0.0],
+            ["Site_2", 1, 0.0, 0.2, 0.6, 0.2, 0.0],
+        ], columns=reset_cols)
         st.rerun()
 
 with tabs[0]:
-    # Calculate validation info
-    prob_cols = [col for col in DEFAULT_COLS if col.startswith("P(")]
+    # Calculate validation info - use actual DataFrame columns
+    prob_cols = [col for col in st.session_state.df.columns if col.startswith("P(")]
     display_df = st.session_state.df.copy()
-    display_df["Prob_Sum"] = display_df[prob_cols].sum(axis=1)
+    if prob_cols:  # Only calculate if there are probability columns
+        display_df["Prob_Sum"] = display_df[prob_cols].sum(axis=1)
+    else:
+        display_df["Prob_Sum"] = 0.0
     display_df["Status"] = display_df["Prob_Sum"].apply(
         lambda x: "✅" if np.isclose(x, 1.0, atol=tol) else "❌"
     )
@@ -312,7 +529,7 @@ with tabs[0]:
             **{"Site_ID": st.column_config.TextColumn("Site_ID"),
                "Copies": st.column_config.NumberColumn("Copies", min_value=1, step=1)},
             **{col: st.column_config.NumberColumn(col, min_value=0.0, max_value=1.0, step=0.001, format="%.3f") 
-               for col in DEFAULT_COLS if col.startswith("P(")},
+               for col in DEFAULT_COLS if col.startswith("P(") and col in display_df.columns},
             "Prob_Sum": st.column_config.NumberColumn("Sum", format="%.3f", help="Sum of all probability columns")
         },
         hide_index=True,
@@ -320,12 +537,18 @@ with tabs[0]:
     )
     
     # Extract only the editable columns back to session state
-    st.session_state.df = edited[DEFAULT_COLS].copy()
+    # Ensure we only select columns that exist in the edited dataframe
+    available_cols = [col for col in DEFAULT_COLS if col in edited.columns]
+    st.session_state.df = edited[available_cols].copy()
 
     # Validation with helpful guidance and enhanced display
     current_df = st.session_state.df.copy()
-    current_df["Prob_Sum"] = current_df[prob_cols].sum(axis=1)
-    current_df["Valid_Row"] = np.isclose(current_df["Prob_Sum"], 1.0, atol=tol)
+    if prob_cols:  # Only calculate if there are probability columns
+        current_df["Prob_Sum"] = current_df[prob_cols].sum(axis=1)
+        current_df["Valid_Row"] = np.isclose(current_df["Prob_Sum"], 1.0, atol=tol)
+    else:
+        current_df["Prob_Sum"] = 0.0
+        current_df["Valid_Row"] = False
 
     bad_rows = current_df.index[~current_df["Valid_Row"]].tolist()
     if len(bad_rows) == 0:
@@ -493,6 +716,275 @@ def window_distribution(arr, off, low=-5, high=+5):
     return window, float(tail_low), float(tail_high)
 
 # -------------------------------
+# Interactive Plotting Functions
+# -------------------------------
+def create_charge_distribution_plot(window_df, tail_low=0, tail_high=0, total_sites=0):
+    """Create interactive bar chart of charge distribution."""
+    
+    # Create the main bar chart
+    fig = go.Figure()
+    
+    # Determine colors based on charge values
+    colors = []
+    for charge in window_df['Charge']:
+        if charge < -2:
+            colors.append('#d62728')  # Red for highly negative
+        elif charge < 0:
+            colors.append('#ff7f0e')  # Orange for negative
+        elif charge == 0:
+            colors.append('#2ca02c')  # Green for neutral
+        elif charge <= 2:
+            colors.append('#1f77b4')  # Blue for positive
+        else:
+            colors.append('#9467bd')  # Purple for highly positive
+    
+    # Add main distribution bars
+    fig.add_trace(go.Bar(
+        x=window_df['Charge'],
+        y=window_df['Probability'],
+        marker_color=colors,
+        name='Probability',
+        hovertemplate='<b>Charge: %{x:+d}</b><br>' +
+                     'Probability: %{y:.4f}<br>' +
+                     'Percentage: %{customdata:.1%}<br>' +
+                     '<extra></extra>',
+        customdata=window_df['Probability']
+    ))
+    
+    # Add tail mass annotations if significant
+    if tail_low > 0.001:
+        fig.add_annotation(
+            x=window_df['Charge'].min() - 0.5,
+            y=max(window_df['Probability']) * 0.8,
+            text=f"◀ Tail mass: {tail_low:.1%}",
+            showarrow=True,
+            arrowhead=2,
+            arrowcolor="red",
+            font=dict(color="red", size=12)
+        )
+    
+    if tail_high > 0.001:
+        fig.add_annotation(
+            x=window_df['Charge'].max() + 0.5,
+            y=max(window_df['Probability']) * 0.8,
+            text=f"Tail mass: {tail_high:.1%} ▶",
+            showarrow=True,
+            arrowhead=2,
+            arrowcolor="red",
+            font=dict(color="red", size=12)
+        )
+    
+    # Styling
+    fig.update_layout(
+        title=f'PTM Charge Distribution ({total_sites} sites)',
+        xaxis_title='Net Charge',
+        yaxis_title='Probability',
+        showlegend=False,
+        template='plotly_white',
+        height=500,
+        hovermode='x unified'
+    )
+    
+    # Format axes
+    fig.update_xaxis(
+        tickmode='linear',
+        tick0=window_df['Charge'].min(),
+        dtick=1,
+        title_font_size=14
+    )
+    fig.update_yaxis(
+        tickformat='.3f',
+        title_font_size=14
+    )
+    
+    return fig
+
+def create_cumulative_distribution_plot(window_df, tail_low=0, tail_high=0):
+    """Create cumulative probability distribution plot."""
+    
+    # Calculate cumulative probabilities
+    charges = window_df['Charge'].values
+    probs = window_df['Probability'].values
+    
+    # Include tail masses
+    full_charges = np.concatenate([[-99], charges, [99]])  # Dummy values for tails
+    full_probs = np.concatenate([[0], probs, [0]])
+    
+    # Add tail masses to first and last positions
+    full_probs[0] = tail_low
+    full_probs[-1] = tail_high
+    
+    # Calculate cumulative sum
+    cumulative = np.cumsum(full_probs)
+    
+    fig = go.Figure()
+    
+    # Main cumulative curve (excluding dummy endpoints)
+    fig.add_trace(go.Scatter(
+        x=charges,
+        y=cumulative[1:-1],  # Exclude dummy endpoints
+        mode='lines+markers',
+        name='Cumulative Probability',
+        line=dict(color='#1f77b4', width=3),
+        marker=dict(size=6),
+        hovertemplate='<b>Up to charge %{x:+d}</b><br>' +
+                     'Cumulative probability: %{y:.3f}<br>' +
+                     '<extra></extra>'
+    ))
+    
+    # Add reference lines
+    fig.add_hline(y=0.5, line_dash="dash", line_color="gray", 
+                  annotation_text="Median (50%)", annotation_position="bottom right")
+    fig.add_hline(y=0.9, line_dash="dot", line_color="orange", 
+                  annotation_text="90%", annotation_position="bottom right")
+    
+    fig.update_layout(
+        title='Cumulative Charge Distribution',
+        xaxis_title='Net Charge',
+        yaxis_title='Cumulative Probability',
+        template='plotly_white',
+        height=400,
+        showlegend=False
+    )
+    
+    fig.update_xaxis(
+        tickmode='linear',
+        tick0=charges.min(),
+        dtick=1
+    )
+    fig.update_yaxis(
+        tickformat='.2f',
+        range=[0, 1]
+    )
+    
+    return fig
+
+def create_combined_plots(window_df, tail_low=0, tail_high=0, total_sites=0):
+    """Create a combined plot with both distribution and cumulative views."""
+    
+    # Create subplots
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=('Probability Distribution', 'Cumulative Distribution'),
+        vertical_spacing=0.12,
+        row_heights=[0.6, 0.4]
+    )
+    
+    # Distribution plot (top)
+    colors = []
+    for charge in window_df['Charge']:
+        if charge < -2:
+            colors.append('#d62728')  # Red for highly negative
+        elif charge < 0:
+            colors.append('#ff7f0e')  # Orange for negative
+        elif charge == 0:
+            colors.append('#2ca02c')  # Green for neutral
+        elif charge <= 2:
+            colors.append('#1f77b4')  # Blue for positive
+        else:
+            colors.append('#9467bd')  # Purple for highly positive
+    
+    fig.add_trace(
+        go.Bar(
+            x=window_df['Charge'],
+            y=window_df['Probability'],
+            marker_color=colors,
+            name='Probability',
+            hovertemplate='<b>Charge: %{x:+d}</b><br>' +
+                         'Probability: %{y:.4f}<br>' +
+                         'Percentage: %{customdata:.1%}<br>' +
+                         '<extra></extra>',
+            customdata=window_df['Probability']
+        ),
+        row=1, col=1
+    )
+    
+    # Cumulative plot (bottom)
+    charges = window_df['Charge'].values
+    probs = window_df['Probability'].values
+    cumulative = np.cumsum(probs)
+    
+    fig.add_trace(
+        go.Scatter(
+            x=charges,
+            y=cumulative,
+            mode='lines+markers',
+            name='Cumulative',
+            line=dict(color='#1f77b4', width=3),
+            marker=dict(size=4),
+            hovertemplate='<b>Up to charge %{x:+d}</b><br>' +
+                         'Cumulative: %{y:.3f}<br>' +
+                         '<extra></extra>'
+        ),
+        row=2, col=1
+    )
+    
+    # Update layout
+    fig.update_layout(
+        title_text=f'PTM Charge Analysis ({total_sites} sites)',
+        showlegend=False,
+        template='plotly_white',
+        height=700
+    )
+    
+    # Update axes
+    fig.update_xaxes(
+        tickmode='linear',
+        tick0=window_df['Charge'].min(),
+        dtick=1,
+        title_text='Net Charge',
+        row=2, col=1
+    )
+    fig.update_yaxes(title_text='Probability', row=1, col=1)
+    fig.update_yaxes(title_text='Cumulative Probability', tickformat='.2f', row=2, col=1)
+    
+    return fig
+
+def create_site_contribution_plot(df):
+    """Create a heatmap showing individual site charge probabilities."""
+    
+    # Get probability columns
+    prob_cols = [col for col in df.columns if col.startswith("P(")]
+    if not prob_cols:
+        return None, False
+    
+    # Prepare data for heatmap
+    site_data = df[["Site_ID"] + prob_cols].copy()
+    
+    # Limit to first 20 sites for readability
+    if len(site_data) > 20:
+        site_data = site_data.head(20)
+        show_warning = True
+    else:
+        show_warning = False
+    
+    # Create heatmap
+    fig = px.imshow(
+        site_data[prob_cols].values,
+        labels=dict(x="Charge State", y="PTM Site", color="Probability"),
+        x=prob_cols,
+        y=site_data['Site_ID'],
+        color_continuous_scale='RdYlBu_r',
+        aspect='auto'
+    )
+    
+    fig.update_layout(
+        title='Individual Site Charge Probabilities' + (' (First 20 sites shown)' if show_warning else ''),
+        height=max(300, len(site_data) * 25),
+        template='plotly_white'
+    )
+    
+    # Update hover template
+    fig.update_traces(
+        hovertemplate='<b>Site:</b> %{y}<br>' +
+                     '<b>Charge:</b> %{x}<br>' +
+                     '<b>Probability:</b> %{z:.3f}<br>' +
+                     '<extra></extra>'
+    )
+    
+    return fig, show_warning
+
+# -------------------------------
 # Task 3 UI
 # -------------------------------
 with tabs[1]:
@@ -502,10 +994,13 @@ with tabs[1]:
     # Use the latest edited table
     df = st.session_state.df.copy()
 
-    # Validate first
-    prob_cols = [col for col in DEFAULT_COLS if col.startswith("P(")]
-    df["Prob_Sum"] = df[prob_cols].sum(axis=1)
-    all_valid = np.all(np.isclose(df["Prob_Sum"].fillna(0), 1.0, atol=tol))
+    # Validate first - use actual DataFrame columns
+    prob_cols = [col for col in df.columns if col.startswith("P(")]
+    if prob_cols:
+        df["Prob_Sum"] = df[prob_cols].sum(axis=1)
+        all_valid = np.all(np.isclose(df["Prob_Sum"].fillna(0), 1.0, atol=tol))
+    else:
+        all_valid = False
     if not all_valid:
         st.error("Fix input rows so each probability row sums to 1 before computing.")
     elif run_btn:
@@ -514,6 +1009,9 @@ with tabs[1]:
             window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -5, +5)
 
             st.success("🎉 Computation completed successfully!")
+            
+            # Quick navigation hint
+            st.info("💡 **Quick tip**: Scroll down for interactive plots, or jump to: [📊 Plots](#interactive-charge-distribution) | [📥 Downloads](#download-results-plots)")
             
             # Results interpretation
             total_sites = len(df[df['Copies'].notna() & (df['Copies'] > 0)])
@@ -531,6 +1029,113 @@ with tabs[1]:
             with col4:
                 central_mass = 1.0 - tail_low - tail_high
                 st.metric("Mass in [-5,+5]", f"{central_mass:.1%}")
+            
+            # Separator and visual prominence for plots section
+            st.markdown("---")
+            
+            # Interactive visualizations
+            st.header("📊 Interactive Charge Distribution")
+            
+            # Plot options in a more prominent, always-visible section
+            plot_col1, plot_col2, plot_col3 = st.columns(3)
+            
+            with plot_col1:
+                plot_style = st.selectbox(
+                    "📊 Plot style:",
+                    ["Combined view", "Distribution only", "Cumulative only", "Site contributions"],
+                    key="plot_style_selector",
+                    help="Choose visualization type - Combined view recommended for full analysis"
+                )
+            
+            with plot_col2:
+                show_tails = st.checkbox("Show tail annotations", value=True, key="show_tails",
+                                       help="Display probability mass outside [-5,+5] window")
+            
+            with plot_col3:
+                plot_height = st.selectbox(
+                    "📏 Plot size:",
+                    ["Standard", "Compact", "Large"],
+                    key="plot_height_selector",
+                    help="Adjust plot height for your screen"
+                )
+            
+            # Advanced options in expander for power users
+            with st.expander("⚙️ Advanced Plot Options", expanded=False):
+                adv_col1, adv_col2 = st.columns(2)
+                
+                with adv_col1:
+                    # Future: Custom charge window
+                    st.info("🚧 Coming soon: Custom charge windows, color themes, export formats")
+                
+                with adv_col2:
+                    # Future: Export options
+                    st.info("💡 Tip: Use browser right-click on plots to save as PNG")
+            
+            # Smart recommendations based on data
+            if total_sites > 50:
+                st.info("🔬 **Large dataset detected** - Combined view recommended to see both distribution shape and cumulative patterns")
+            elif total_sites < 5:
+                st.info("🎯 **Small dataset** - Site contributions view shows individual site patterns clearly")
+            
+            # Generate and display plots based on user selection
+            if plot_style == "Combined view":
+                combined_fig = create_combined_plots(window_df, tail_low, tail_high, total_sites)
+                if plot_height == "Compact":
+                    combined_fig.update_layout(height=500)
+                elif plot_height == "Large":
+                    combined_fig.update_layout(height=900)
+                st.plotly_chart(combined_fig, use_container_width=True, key="combined_plot")
+                
+            elif plot_style == "Distribution only":
+                dist_fig = create_charge_distribution_plot(window_df, 
+                                                         tail_low if show_tails else 0, 
+                                                         tail_high if show_tails else 0, 
+                                                         total_sites)
+                height_map = {"Compact": 350, "Standard": 500, "Large": 650}
+                dist_fig.update_layout(height=height_map[plot_height])
+                st.plotly_chart(dist_fig, use_container_width=True, key="dist_plot")
+                
+            elif plot_style == "Cumulative only":
+                cum_fig = create_cumulative_distribution_plot(window_df, tail_low, tail_high)
+                height_map = {"Compact": 300, "Standard": 400, "Large": 550}
+                cum_fig.update_layout(height=height_map[plot_height])
+                st.plotly_chart(cum_fig, use_container_width=True, key="cum_plot")
+                
+            else:  # Site contributions
+                site_fig, show_warning = create_site_contribution_plot(df)
+                if site_fig is not None:
+                    if show_warning:
+                        st.info("ℹ️ Showing first 20 sites only for readability. All sites are still included in the overall calculation.")
+                    st.plotly_chart(site_fig, use_container_width=True, key="site_plot")
+                else:
+                    st.error("Cannot create site contribution plot - no probability data found.")
+            
+            # Plot insights
+            with st.expander("📈 Plot Interpretation Guide", expanded=False):
+                st.markdown("""
+                **📊 Distribution Plot (Bar Chart):**
+                - **Height of bars**: Probability of each charge state
+                - **Colors**: Red/Orange (negative), Green (neutral), Blue/Purple (positive)  
+                - **Hover**: Detailed probability and percentage information
+                - **Shape**: Symmetric = balanced PTMs, Skewed = biased charge pattern
+                
+                **📈 Cumulative Plot (Line Chart):**
+                - **Y-axis**: Probability of having charge ≤ X
+                - **Steep rise**: Most probability concentrated in narrow range
+                - **Gradual rise**: Probability spread across wide charge range
+                - **50% line**: Median charge (half of molecules below this charge)
+                
+                **🔥 Site Contributions (Heatmap):**
+                - **Red areas**: High probability charge states for each site
+                - **Blue areas**: Low probability charge states
+                - **Vertical patterns**: Sites with similar charge preferences
+                - **Horizontal patterns**: Charge states preferred across many sites
+                
+                **🎯 Key Patterns:**
+                - **Sharp peak**: Consistent charge behavior, predictable protein
+                - **Broad distribution**: Variable charge behavior, heterogeneous population
+                - **Multiple peaks**: Distinct charge populations or PTM patterns
+                """)
             
             # Technical details in expander
             with st.expander("🔬 Technical Details", expanded=False):
@@ -555,7 +1160,49 @@ with tabs[1]:
             st.dataframe(window_df, use_container_width=True)
 
             # Enhanced downloads with metadata
-            st.subheader("📥 Download Results")
+            st.subheader("📥 Download Results & Plots")
+            
+            # Plot downloads in a separate row
+            plot_col1, plot_col2, plot_col3 = st.columns(3)
+            
+            with plot_col1:
+                if st.button("💾 Save Distribution Plot", key="save_dist_plot"):
+                    dist_fig = create_charge_distribution_plot(window_df, tail_low, tail_high, total_sites)
+                    plot_html = dist_fig.to_html(include_plotlyjs='cdn')
+                    st.download_button(
+                        "📊 Download as HTML",
+                        data=plot_html.encode(),
+                        file_name=f"ptm_charge_distribution_{total_sites}sites.html",
+                        mime="text/html",
+                        key="download_dist_html"
+                    )
+            
+            with plot_col2:
+                if st.button("📈 Save Cumulative Plot", key="save_cum_plot"):
+                    cum_fig = create_cumulative_distribution_plot(window_df, tail_low, tail_high)
+                    plot_html = cum_fig.to_html(include_plotlyjs='cdn')
+                    st.download_button(
+                        "📈 Download as HTML", 
+                        data=plot_html.encode(),
+                        file_name=f"ptm_cumulative_distribution_{total_sites}sites.html",
+                        mime="text/html",
+                        key="download_cum_html"
+                    )
+            
+            with plot_col3:
+                if st.button("📊📈 Save Combined Plot", key="save_combined_plot"):
+                    combined_fig = create_combined_plots(window_df, tail_low, tail_high, total_sites)
+                    plot_html = combined_fig.to_html(include_plotlyjs='cdn')
+                    st.download_button(
+                        "📊📈 Download as HTML",
+                        data=plot_html.encode(), 
+                        file_name=f"ptm_combined_plots_{total_sites}sites.html",
+                        mime="text/html",
+                        key="download_combined_html"
+                    )
+            
+            st.markdown("---")
+            
             c1, c2, c3 = st.columns(3)
             
             with c1:

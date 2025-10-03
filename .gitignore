@@ -1,0 +1,65 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# macOS
+.DS_Store
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Streamlit caches and temp files
+.streamlit/
+.ghostwriter/
+
+# OS generated files
+Thumbs.db
+
+# Python test output
+.pytest_cache/
+
+# VS Code settings
+.vscode/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Wheel
+*.whl
+
+# env files
+.env
+
+# System files
+.DS_Store
+
+# Skip any large exported csvs or results
+*.csv
+*.xlsx
+*.xls
+
+# Keep sample data but ignore exports
+!sample_ptm_n100.csv
