@@ -505,41 +505,45 @@ with status_col2:
         st.rerun()
 
 with tabs[0]:
-    # Calculate validation info - use actual DataFrame columns
+
+    # Calculate validation info - always use actual probability columns present in the DataFrame
     prob_cols = [col for col in st.session_state.df.columns if col.startswith("P(")]
     display_df = st.session_state.df.copy()
-    if prob_cols:  # Only calculate if there are probability columns
+    if prob_cols:
         display_df["Prob_Sum"] = display_df[prob_cols].sum(axis=1)
     else:
         display_df["Prob_Sum"] = 0.0
     display_df["Status"] = display_df["Prob_Sum"].apply(
         lambda x: "✅" if np.isclose(x, 1.0, atol=tol) else "❌"
     )
-    
-    # Reorder columns to show Status first for visibility
-    display_cols = ["Status"] + DEFAULT_COLS + ["Prob_Sum"]
+
+    # Dynamically build display columns: Status, all actual columns, Prob_Sum
+    base_cols = [col for col in ["Site_ID", "Copies"] if col in display_df.columns]
+    prob_display_cols = [col for col in display_df.columns if col.startswith("P(")]
+    display_cols = ["Status"] + base_cols + prob_display_cols + ["Prob_Sum"]
     display_df = display_df[display_cols]
-    
+
+    # Editor: use actual columns for editing and config
     edited = st.data_editor(
         display_df,
         use_container_width=True,
         num_rows="dynamic",
         column_config={
             "Status": st.column_config.TextColumn("✓", width="small", help="✅ = Valid row, ❌ = Invalid row"),
-            **{"Site_ID": st.column_config.TextColumn("Site_ID"),
-               "Copies": st.column_config.NumberColumn("Copies", min_value=1, step=1)},
+            **{"Site_ID": st.column_config.TextColumn("Site_ID") if "Site_ID" in display_df.columns else {},
+               "Copies": st.column_config.NumberColumn("Copies", min_value=1, step=1) if "Copies" in display_df.columns else {}},
             **{col: st.column_config.NumberColumn(col, min_value=0.0, max_value=1.0, step=0.001, format="%.3f") 
-               for col in DEFAULT_COLS if col.startswith("P(") and col in display_df.columns},
+               for col in prob_display_cols},
             "Prob_Sum": st.column_config.NumberColumn("Sum", format="%.3f", help="Sum of all probability columns")
         },
         hide_index=True,
-        disabled=["Status", "Prob_Sum"]  # Make status and sum read-only
+        disabled=["Status", "Prob_Sum"]
     )
-    
+
     # Extract only the editable columns back to session state
-    # Ensure we only select columns that exist in the edited dataframe
-    available_cols = [col for col in DEFAULT_COLS if col in edited.columns]
-    st.session_state.df = edited[available_cols].copy()
+    # Use all columns except Status and Prob_Sum
+    editable_cols = [col for col in display_df.columns if col not in ("Status", "Prob_Sum")]
+    st.session_state.df = edited[editable_cols].copy()
 
     # Validation with helpful guidance and enhanced display
     current_df = st.session_state.df.copy()
@@ -1258,3 +1262,4 @@ Analysis Date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M")}"""
             st.error(f"Computation failed: {e}")
 
 st.caption("Tip: You can later extend input columns to 11 states (−5…+5). The computation tab will still work — just adjust the base PMF and offset.")
+
