@@ -70,6 +70,23 @@ def generate_charge_columns(min_charge, max_charge):
             charge_cols.append(f"P({charge})")
     return base_cols + charge_cols
 
+# Helper utilities
+def index_for_charge(charge, min_charge):
+    """Return column index (0-based) for a given integer charge value relative to min_charge."""
+    return int(charge - min_charge)
+
+def neutral_index_for_range(min_charge, max_charge):
+    """Return the index corresponding to the charge closest to 0 within [min_charge, max_charge].
+    If 0 is present, that index is returned. Otherwise the index for the charge with smallest
+    absolute value is returned (e.g. for -7..-1 this returns index for -1).
+    """
+    # If 0 in range use it
+    if min_charge <= 0 <= max_charge:
+        return index_for_charge(0, min_charge)
+    # Otherwise choose charge closest to zero
+    candidate = min(range(min_charge, max_charge + 1), key=lambda x: abs(x))
+    return index_for_charge(candidate, min_charge)
+
 # Function to auto-detect charge system from existing data
 def auto_detect_charge_system(df):
     """Auto-detect the charge system from DataFrame columns."""
@@ -190,16 +207,17 @@ with st.sidebar:
             example_probs_2 = [0.0] * (new_max_charge - new_min_charge + 1)
             
             # Set neutral (charge 0) to 1.0 for first site
-            neutral_index = -new_min_charge  # Index for charge 0
+            neutral_index = neutral_index_for_range(new_min_charge, new_max_charge)
             example_probs_1[neutral_index] = 1.0
             
             # Set balanced distribution for second site
             if new_max_charge >= 1 and new_min_charge <= -1:
                 example_probs_2[neutral_index] = 0.6  # P(0) = 0.6
-                if neutral_index > 0:  # P(-1) = 0.2
-                    example_probs_2[neutral_index - 1] = 0.2
-                if neutral_index < len(example_probs_2) - 1:  # P(+1) = 0.2
-                    example_probs_2[neutral_index + 1] = 0.2
+                # set nearest neighbors only if they exist in the range
+                if index_for_charge(-1, new_min_charge) >= 0 and index_for_charge(-1, new_min_charge) < len(example_probs_2):
+                    example_probs_2[index_for_charge(-1, new_min_charge)] = 0.2
+                if index_for_charge(1, new_min_charge) >= 0 and index_for_charge(1, new_min_charge) < len(example_probs_2):
+                    example_probs_2[index_for_charge(1, new_min_charge)] = 0.2
             else:
                 example_probs_2[neutral_index] = 1.0
             
@@ -292,16 +310,16 @@ with st.sidebar:
         current_min = st.session_state.get('min_charge', -2)
         current_max = st.session_state.get('max_charge', 2)
         charge_range = current_max - current_min + 1
-        neutral_index = -current_min
-        
-        # Create probability array with neutral charge = 1.0, others = 0.0
+        neutral_index = neutral_index_for_range(current_min, current_max)
+
+        # Create probability array with neutral-like charge = 1.0, others = 0.0
         blank_probs = [0.0] * charge_range
         blank_probs[neutral_index] = 1.0
-        
+
         new_rows = []
         for _ in range(add_rows):
             new_rows.append(["", 1] + blank_probs)
-        
+
         new = pd.DataFrame(new_rows, columns=DEFAULT_COLS)
         st.session_state.df = pd.concat([st.session_state.df, new], ignore_index=True)
         st.success(f"Added {add_rows} blank rows")
@@ -317,7 +335,7 @@ with st.sidebar:
             current_min = st.session_state.min_charge
             current_max = st.session_state.max_charge
             charge_range = current_max - current_min + 1
-            neutral_index = -current_min  # Index for charge 0
+            neutral_index = neutral_index_for_range(current_min, current_max)
             
             for i in range(1, 101):
                 site_id = f"Site_{i}"
@@ -325,36 +343,44 @@ with st.sidebar:
                 probs = [0.0] * charge_range
                 
                 if i % 4 == 0:  # Neutral dominant
-                    probs[neutral_index] = 0.8  # P(0)
-                    if neutral_index > 0:  # P(-1) if available
-                        probs[neutral_index - 1] = 0.1
-                    if neutral_index < charge_range - 1:  # P(+1) if available
-                        probs[neutral_index + 1] = 0.1
+                    probs[neutral_index] = 0.8  # center
+                    # neighbor -1
+                    idx_minus1 = index_for_charge(-1, current_min)
+                    idx_plus1 = index_for_charge(1, current_min)
+                    if 0 <= idx_minus1 < charge_range:
+                        probs[idx_minus1] = 0.1
+                    if 0 <= idx_plus1 < charge_range:
+                        probs[idx_plus1] = 0.1
                         
                 elif i % 4 == 1:  # Slightly positive bias
-                    probs[neutral_index] = 0.6  # P(0)
-                    if neutral_index < charge_range - 1:  # P(+1) if available
-                        probs[neutral_index + 1] = 0.3
-                    if neutral_index < charge_range - 2:  # P(+2) if available
-                        probs[neutral_index + 2] = 0.1
+                    probs[neutral_index] = 0.6  # center
+                    idx_p1 = index_for_charge(1, current_min)
+                    idx_p2 = index_for_charge(2, current_min)
+                    if 0 <= idx_p1 < charge_range:
+                        probs[idx_p1] = 0.3
+                    if 0 <= idx_p2 < charge_range:
+                        probs[idx_p2] = 0.1
                     else:
-                        probs[neutral_index] += 0.1  # Add back to neutral if +2 not available
+                        probs[neutral_index] += 0.1
                         
                 elif i % 4 == 2:  # Slightly negative bias
-                    probs[neutral_index] = 0.6  # P(0)
-                    if neutral_index > 0:  # P(-1) if available
-                        probs[neutral_index - 1] = 0.3
-                    if neutral_index > 1:  # P(-2) if available
-                        probs[neutral_index - 2] = 0.1
+                    probs[neutral_index] = 0.6  # center
+                    idx_m1 = index_for_charge(-1, current_min)
+                    idx_m2 = index_for_charge(-2, current_min)
+                    if 0 <= idx_m1 < charge_range:
+                        probs[idx_m1] = 0.3
+                    if 0 <= idx_m2 < charge_range:
+                        probs[idx_m2] = 0.1
                     else:
-                        probs[neutral_index] += 0.1  # Add back to neutral if -2 not available
+                        probs[neutral_index] += 0.1
                         
                 else:  # Balanced
                     probs[neutral_index] = 0.5  # P(0)
                     remaining_prob = 0.5
                     # Distribute remaining probability symmetrically
+                    # distribute symmetrically around chosen center (closest-to-zero index)
                     for offset in range(1, min(3, neutral_index + 1, charge_range - neutral_index)):
-                        prob_each = remaining_prob / (2 * offset) if offset <= 2 else 0.05
+                        prob_each = remaining_prob / (2 * min(2, offset))
                         if neutral_index - offset >= 0:
                             probs[neutral_index - offset] = prob_each
                         if neutral_index + offset < charge_range:
@@ -400,14 +426,17 @@ with st.sidebar:
                 elif template_type == "Acidic sites (negative)":
                     # Distribute probability towards negative charges
                     if current_min <= -2:
-                        probs[neutral_index + current_min] = 0.2  # Most negative
-                        if current_min <= -1:
-                            probs[neutral_index - 1] = 0.6  # P(-1)
-                        probs[neutral_index] = 0.2  # P(0)
+                        # index for most negative is 0
+                        probs[0] = 0.2
+                        if 0 <= index_for_charge(-1, current_min) < charge_range:
+                            probs[index_for_charge(-1, current_min)] = 0.6
+                        probs[neutral_index] = 0.2
                     else:
                         # If range doesn't go to -2, distribute available negative charges
                         if current_min <= -1:
-                            probs[neutral_index - 1] = 0.8
+                            idx_m1 = index_for_charge(-1, current_min)
+                            if 0 <= idx_m1 < charge_range:
+                                probs[idx_m1] = 0.8
                             probs[neutral_index] = 0.2
                         else:
                             probs[neutral_index] = 1.0
@@ -415,14 +444,19 @@ with st.sidebar:
                 elif template_type == "Basic sites (positive)":
                     # Distribute probability towards positive charges
                     if current_max >= 2:
-                        probs[neutral_index + 2] = 0.2  # P(+2)
-                        if current_max >= 1:
-                            probs[neutral_index + 1] = 0.6  # P(+1)
-                        probs[neutral_index] = 0.2  # P(0)
+                        idx_p2 = index_for_charge(2, current_min)
+                        idx_p1 = index_for_charge(1, current_min)
+                        if 0 <= idx_p2 < charge_range:
+                            probs[idx_p2] = 0.2
+                        if 0 <= idx_p1 < charge_range:
+                            probs[idx_p1] = 0.6
+                        probs[neutral_index] = 0.2
                     else:
                         # If range doesn't go to +2, distribute available positive charges
                         if current_max >= 1:
-                            probs[neutral_index + 1] = 0.8
+                            idx_p1 = index_for_charge(1, current_min)
+                            if 0 <= idx_p1 < charge_range:
+                                probs[idx_p1] = 0.8
                             probs[neutral_index] = 0.2
                         else:
                             probs[neutral_index] = 1.0
@@ -447,9 +481,13 @@ with st.sidebar:
                     else:  # Neutral sites
                         probs[neutral_index] = 0.8
                         if current_min <= -1:
-                            probs[neutral_index - 1] = 0.1
+                            idx_m1 = index_for_charge(-1, current_min)
+                            if 0 <= idx_m1 < charge_range:
+                                probs[idx_m1] = 0.1
                         if current_max >= 1:
-                            probs[neutral_index + 1] = 0.1
+                            idx_p1 = index_for_charge(1, current_min)
+                            if 0 <= idx_p1 < charge_range:
+                                probs[idx_p1] = 0.1
                 
                 template_data.append([site_id, copies] + probs)
             
