@@ -475,107 +475,58 @@ with status_col2:
 
 with tabs[0]:
 
-    # Calculate validation info - always use actual probability columns present in the DataFrame
+    # Build a compact preview with a simple validation indicator
     prob_cols = [col for col in st.session_state.df.columns if col.startswith("P(")]
     display_df = st.session_state.df.copy()
     if prob_cols:
         display_df["Prob_Sum"] = display_df[prob_cols].sum(axis=1)
+        display_df["Status"] = display_df["Prob_Sum"].apply(lambda x: "✅" if np.isclose(x, 1.0, atol=tol) else "❌")
     else:
         display_df["Prob_Sum"] = 0.0
-    display_df["Status"] = display_df["Prob_Sum"].apply(
-        lambda x: "✅" if np.isclose(x, 1.0, atol=tol) else "❌"
-    )
+        display_df["Status"] = "❌"
 
-    # Dynamically build display columns: Status, all actual columns, Prob_Sum
+    # Keep preview columns compact: Status, Site_ID, Copies, probabilities, Sum
     base_cols = [col for col in ["Site_ID", "Copies"] if col in display_df.columns]
     prob_display_cols = [col for col in display_df.columns if col.startswith("P(")]
     display_cols = ["Status"] + base_cols + prob_display_cols + ["Prob_Sum"]
     display_df = display_df[display_cols]
 
-    # Editor: use actual columns for editing and config
+    # Editor: keep Status and Prob_Sum read-only
     edited = st.data_editor(
         display_df,
         width='stretch',
         num_rows="dynamic",
         column_config={
-            "Status": st.column_config.TextColumn("✓", width="small", help="✅ = Valid row, ❌ = Invalid row"),
+            "Status": st.column_config.TextColumn("Status", width="small", help="✅ = Valid, ❌ = Invalid"),
             **{"Site_ID": st.column_config.TextColumn("Site_ID") if "Site_ID" in display_df.columns else {},
                "Copies": st.column_config.NumberColumn("Copies", min_value=1, step=1) if "Copies" in display_df.columns else {}},
             **{col: st.column_config.NumberColumn(col, min_value=0.0, max_value=1.0, step=0.001, format="%.3f") 
                for col in prob_display_cols},
-            "Prob_Sum": st.column_config.NumberColumn("Sum", format="%.3f", help="Sum of all probability columns")
+            "Prob_Sum": st.column_config.NumberColumn("Sum", format="%.3f", help="Sum of probability columns")
         },
         hide_index=True,
         disabled=["Status", "Prob_Sum"]
     )
 
-    # Extract only the editable columns back to session state
-    # Use all columns except Status and Prob_Sum
+    # Persist edits back to session state (exclude Status and Prob_Sum)
     editable_cols = [col for col in display_df.columns if col not in ("Status", "Prob_Sum")]
     st.session_state.df = edited[editable_cols].copy()
 
-    # Validation with helpful guidance and enhanced display
+    # Show a compact validation message
     current_df = st.session_state.df.copy()
-    if prob_cols:  # Only calculate if there are probability columns
+    if prob_cols:
         current_df["Prob_Sum"] = current_df[prob_cols].sum(axis=1)
-        current_df["Valid_Row"] = np.isclose(current_df["Prob_Sum"], 1.0, atol=tol)
+        valid_mask = np.isclose(current_df["Prob_Sum"].fillna(0.0), 1.0, atol=tol)
     else:
-        current_df["Prob_Sum"] = 0.0
-        current_df["Valid_Row"] = False
+        valid_mask = np.array([False] * len(current_df))
 
-    bad_rows = current_df.index[~current_df["Valid_Row"]].tolist()
-    if len(bad_rows) == 0:
-        st.success("✅ All rows valid (probability sums = 1 within tolerance).")
+    bad_rows = np.count_nonzero(~valid_mask)
+    if bad_rows == 0:
+        st.success(f"Dataset ready: {len(current_df)} PTM sites, all valid")
     else:
-        st.error(f"⚠️ {len(bad_rows)} row(s) have probability sums ≠ 1 (tolerance: ±{tol})")
-        st.info("🔍 **Invalid rows show ❌ in the Status column** - look for the red X marks in the first column")
-        
-        with st.expander("🔧 Need help fixing probability rows?", expanded=True):
-            st.markdown("""
-            **Each row's probabilities must sum to exactly 1.0**
-            
-            **Visual cues in the table above:**
-            - ✅ **Valid rows**: Green checkmark in Status column
-            - ❌ **Invalid rows**: Red X in Status column
-            - **Sum column**: Shows the actual sum of probabilities
-            
-            **Common issues:**
-            - Probabilities sum to more than 1 (e.g., 0.3 + 0.4 + 0.5 = 1.2) ❌
-            - Probabilities sum to less than 1 (e.g., 0.2 + 0.3 + 0.3 = 0.8) ❌
-            
-            **Quick fixes:**
-            - Use decimals that add to 1: `0.1 + 0.2 + 0.4 + 0.2 + 0.1 = 1.0` ✅
-            - For neutral sites: set P(0) = 1.0, others = 0.0 ✅
-            - For charged sites: distribute probabilities (e.g., P(-1)=0.3, P(0)=0.7) ✅
-            """)
-            
-            # Show which specific rows are problematic with their actual sums
-            if len(bad_rows) <= 10:  # Only show if not too many
-                problem_rows = current_df.loc[bad_rows, ["Site_ID"] + prob_cols + ["Prob_Sum"]].copy()
-                problem_rows["Error"] = problem_rows["Prob_Sum"] - 1.0
-                st.markdown("**❌ Problematic rows (from table above):**")
-                st.dataframe(
-                    problem_rows.style.format({"Prob_Sum": "{:.3f}", "Error": "{:+.3f}"}),
-                    width='stretch'
-                )
+        st.warning(f"{bad_rows} row(s) have probability sums ≠ 1 (they will be normalized during computation)")
 
-    st.subheader("Preview (with validation)")
-    st.dataframe(edited, width='stretch')
-
-    col1, col2 = st.columns(2)
-    with col1:
-        csv_bytes = edited[DEFAULT_COLS].to_csv(index=False).encode("utf-8")
-        st.download_button("Download CSV (input)", data=csv_bytes, file_name=f"{fname_base}.csv",
-                           mime="text/csv", disabled=len(bad_rows)>0)
-
-    with col2:
-        xlsx_buf = io.BytesIO()
-        with pd.ExcelWriter(xlsx_buf, engine="openpyxl") as writer:
-            edited[DEFAULT_COLS].to_excel(writer, index=False, sheet_name="PTM_Input")
-        st.download_button("Download Excel (.xlsx, input)", data=xlsx_buf.getvalue(),
-                           file_name=f"{fname_base}.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                           disabled=len(bad_rows)>0)
+    # Downloads are available from the sidebar 'Downloads' expander to avoid duplication
 
 # -------------------------------
 # Helpers for Task 3 (PGF/PMF math)
@@ -975,10 +926,25 @@ with tabs[1]:
     else:
         all_valid = False
     if not all_valid:
-        st.error("Fix input rows so each probability row sums to 1 before computing.")
-    elif run_btn:
+        st.warning("Some rows have probability sums ≠ 1 — they'll be normalized for computation. Check the preview to fix if desired.")
+    if run_btn:
         try:
-            pmf_arr, pmf_off = overall_charge_distribution(df)
+            # Make a normalized copy of the data for computation so we don't modify the preview
+            df_for_compute = df.copy()
+            if prob_cols:
+                for idx, row in df_for_compute.iterrows():
+                    probs = row[prob_cols].astype(float).fillna(0.0)
+                    s = probs.sum()
+                    if s <= 0:
+                        # set neutral probability to 1 if row is all zeros
+                        neutral_idx = neutral_index_for_range(st.session_state.get('min_charge', -2), st.session_state.get('max_charge', 2))
+                        probs = pd.Series(0.0, index=prob_cols)
+                        probs.iloc[neutral_idx] = 1.0
+                    else:
+                        probs = probs / s
+                    df_for_compute.loc[idx, prob_cols] = probs.values
+
+            pmf_arr, pmf_off = overall_charge_distribution(df_for_compute)
             window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -5, +5)
 
             st.success("🎉 Computation completed successfully!")
