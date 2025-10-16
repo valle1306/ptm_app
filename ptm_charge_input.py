@@ -51,7 +51,7 @@ with st.expander("📚 How to use this tool", expanded=False):
         - Tail masses: Extreme charges (usually very low probability)
         """)
     
-    st.info("💡 **Pro tip**: Start with templates, then modify probabilities based on your experimental data!")
+    st.info("Pro tip: Start with templates, then modify probabilities based on your experimental data.")
 
 # -------------------------------
 # Data-entry (Task 1 & 2)
@@ -145,7 +145,7 @@ with st.sidebar:
     st.header("Data Input Options")
     
     # Charge system selector with more options
-    st.subheader("⚙️ Charge System")
+    st.subheader("Charge System")
     
     # Enhanced charge system options
     charge_options = {
@@ -231,127 +231,34 @@ with st.sidebar:
     # Update DEFAULT_COLS for current session
     DEFAULT_COLS = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
     
-    # File upload section
-    st.subheader("📁 Upload CSV File")
-    uploaded_file = st.file_uploader(
-        "Upload existing PTM data (CSV format)", 
-        type=['csv'],
-        help=f"CSV should have columns for {st.session_state.charge_system} system",
-        key="csv_uploader"
-    )
-    
-    if uploaded_file is not None:
-        try:
-            uploaded_df = pd.read_csv(uploaded_file)
-            
-            # Auto-detect charge system from uploaded file
-            uploaded_cols = set(uploaded_df.columns)
-            detected_system, detected_min, detected_max = auto_detect_charge_system(uploaded_df)
-            
-            # Generate columns for detected system based on what we actually found
-            detected_cols = generate_charge_columns(detected_min, detected_max)
-            
-            # Check if all required columns exist in the uploaded file
-            if set(detected_cols).issubset(uploaded_cols):
-                # Update session state with detected system ONLY if we can successfully load
-                st.session_state.charge_system = detected_system
-                st.session_state.min_charge = detected_min
-                st.session_state.max_charge = detected_max
-                
-                # Update DEFAULT_COLS for current session
-                DEFAULT_COLS = detected_cols
-                
-                st.success(f"🔍 Detected {detected_system} charge system ({detected_min} to {detected_max}) from uploaded file")
-                
-                # Ensure numeric columns are properly typed
-                numeric_cols = ["Copies"] + [col for col in DEFAULT_COLS if col.startswith("P(")]
-                for col in numeric_cols:
-                    if col in uploaded_df.columns:
-                        uploaded_df[col] = pd.to_numeric(uploaded_df[col], errors='coerce')
-                
-                # Show preview first
-                st.info(f"Preview: {len(uploaded_df)} rows found")
-                st.dataframe(uploaded_df.head(), use_container_width=True)
-                
-                # Two options: button click or automatic loading
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    if st.button("Load uploaded data", key="load_csv_data"):
-                        st.session_state.df = uploaded_df[DEFAULT_COLS].copy()
-                        st.success(f"✅ Loaded {len(uploaded_df)} rows from {uploaded_file.name}")
-                        st.rerun()
-                
-                with col_b:
-                    # Auto-load option
-                    if st.checkbox("Auto-load when file changes", key="auto_load_csv"):
-                        # Create a unique key based on file content to detect changes
-                        file_hash = hash(str(uploaded_df.values.tobytes()))
-                        if f"last_file_hash" not in st.session_state or st.session_state.last_file_hash != file_hash:
-                            st.session_state.df = uploaded_df[DEFAULT_COLS].copy()
-                            st.session_state.last_file_hash = file_hash
-                            st.success(f"🔄 Auto-loaded {len(uploaded_df)} rows from {uploaded_file.name}")
-                            st.rerun()
-                    
-            else:
-                missing_cols = set(detected_cols) - uploaded_cols
-                st.error(f"Missing required columns: {', '.join(missing_cols)}")
-                st.info("Expected columns for detected system: " + ", ".join(detected_cols))
-                st.info("Available columns in CSV: " + ", ".join(sorted(uploaded_cols)))
-                
-        except Exception as e:
-            st.error(f"Error reading CSV file: {str(e)}")
-            st.error("Please check that your CSV file is properly formatted.")
-    
     st.markdown("---")
-    st.subheader("📝 Manual Entry Controls")
-    add_rows = st.number_input("Add blank rows", min_value=0, max_value=100, value=0, step=1)
-    if st.button("Insert", key="insert_blank_rows"):
-        # Create blank rows with correct number of columns for current charge system
-        current_min = st.session_state.get('min_charge', -2)
-        current_max = st.session_state.get('max_charge', 2)
-        charge_range = current_max - current_min + 1
-        neutral_index = neutral_index_for_range(current_min, current_max)
 
-        # Create probability array with neutral-like charge = 1.0, others = 0.0
-        blank_probs = [0.0] * charge_range
-        blank_probs[neutral_index] = 1.0
+    # Compact quick actions: N=100 generator + Insert N blank rows
+    st.subheader("Quick Start")
+    quick_left, quick_right = st.columns([2, 1])
 
-        new_rows = []
-        for _ in range(add_rows):
-            new_rows.append(["", 1] + blank_probs)
-
-        new = pd.DataFrame(new_rows, columns=DEFAULT_COLS)
-        st.session_state.df = pd.concat([st.session_state.df, new], ignore_index=True)
-        st.success(f"Added {add_rows} blank rows")
-
-    # Quick templates section
-    st.subheader("🚀 Quick Start Templates")
-    
-    template_col1, template_col2 = st.columns(2)
-    
-    with template_col1:
-        if st.button("📊 Generate N=100 template", key="generate_n100_template"):
+    with quick_left:
+        if st.button("Generate N=100 template", key="generate_n100_template"):
             template_data = []
             current_min = st.session_state.min_charge
             current_max = st.session_state.max_charge
             charge_range = current_max - current_min + 1
             neutral_index = neutral_index_for_range(current_min, current_max)
-            
+
             for i in range(1, 101):
                 site_id = f"Site_{i}"
                 copies = 1
                 probs = [0.0] * charge_range
-                
+
                 if i % 4 == 0:  # Neutral dominant
                     probs[neutral_index] = 0.8  # center
-                    # neighbor -1
                     idx_minus1 = index_for_charge(-1, current_min)
                     idx_plus1 = index_for_charge(1, current_min)
                     if 0 <= idx_minus1 < charge_range:
                         probs[idx_minus1] = 0.1
                     if 0 <= idx_plus1 < charge_range:
                         probs[idx_plus1] = 0.1
-                        
+
                 elif i % 4 == 1:  # Slightly positive bias
                     probs[neutral_index] = 0.6  # center
                     idx_p1 = index_for_charge(1, current_min)
@@ -362,7 +269,7 @@ with st.sidebar:
                         probs[idx_p2] = 0.1
                     else:
                         probs[neutral_index] += 0.1
-                        
+
                 elif i % 4 == 2:  # Slightly negative bias
                     probs[neutral_index] = 0.6  # center
                     idx_m1 = index_for_charge(-1, current_min)
@@ -373,12 +280,10 @@ with st.sidebar:
                         probs[idx_m2] = 0.1
                     else:
                         probs[neutral_index] += 0.1
-                        
+
                 else:  # Balanced
                     probs[neutral_index] = 0.5  # P(0)
                     remaining_prob = 0.5
-                    # Distribute remaining probability symmetrically
-                    # distribute symmetrically around chosen center (closest-to-zero index)
                     for offset in range(1, min(3, neutral_index + 1, charge_range - neutral_index)):
                         prob_each = remaining_prob / (2 * min(2, offset))
                         if neutral_index - offset >= 0:
@@ -388,51 +293,63 @@ with st.sidebar:
                         remaining_prob -= 2 * prob_each
                         if remaining_prob <= 0:
                             break
-                    
-                    # Add any remaining probability back to neutral
                     probs[neutral_index] += remaining_prob
-                
+
                 template_data.append([site_id, copies] + probs)
-            
+
             template_df = pd.DataFrame(template_data, columns=DEFAULT_COLS)
             st.session_state.df = template_df
             st.success("✅ Generated N=100 template with varied probability patterns")
             st.rerun()
-    
-    with template_col2:
+
+    with quick_right:
+        add_rows = st.number_input("Insert blank rows", min_value=0, max_value=100, value=0, step=1, key="add_rows_compact")
+        if st.button("Insert", key="insert_blank_rows"):
+            current_min = st.session_state.get('min_charge', -2)
+            current_max = st.session_state.get('max_charge', 2)
+            charge_range = current_max - current_min + 1
+            neutral_index = neutral_index_for_range(current_min, current_max)
+
+            blank_probs = [0.0] * charge_range
+            blank_probs[neutral_index] = 1.0
+
+            new_rows = []
+            for _ in range(add_rows):
+                new_rows.append(["", 1] + blank_probs)
+
+            new = pd.DataFrame(new_rows, columns=DEFAULT_COLS)
+            st.session_state.df = pd.concat([st.session_state.df, new], ignore_index=True)
+            st.success(f"Added {add_rows} blank rows")
+
+    # Templates & advanced options (collapsed)
+    with st.expander("Templates & advanced", expanded=False):
         template_type = st.selectbox(
-            "Common site types:",
+            "Template type",
             ["Neutral sites only", "Acidic sites (negative)", "Basic sites (positive)", "Mixed population"],
             key="template_selector"
         )
-        
         n_sites = st.number_input("Number of sites:", min_value=1, max_value=200, value=10, key="template_n_sites")
-        
         if st.button("Generate custom template", key="generate_custom_template"):
             template_data = []
             current_min = st.session_state.min_charge
             current_max = st.session_state.max_charge
             charge_range = current_max - current_min + 1
             neutral_index = -current_min  # Index for charge 0
-            
+
             for i in range(1, n_sites + 1):
                 site_id = f"Site_{i}"
                 copies = 1
                 probs = [0.0] * charge_range
-                
+
                 if template_type == "Neutral sites only":
-                    probs[neutral_index] = 1.0  # All neutral
-                    
+                    probs[neutral_index] = 1.0
                 elif template_type == "Acidic sites (negative)":
-                    # Distribute probability towards negative charges
                     if current_min <= -2:
-                        # index for most negative is 0
                         probs[0] = 0.2
                         if 0 <= index_for_charge(-1, current_min) < charge_range:
                             probs[index_for_charge(-1, current_min)] = 0.6
                         probs[neutral_index] = 0.2
                     else:
-                        # If range doesn't go to -2, distribute available negative charges
                         if current_min <= -1:
                             idx_m1 = index_for_charge(-1, current_min)
                             if 0 <= idx_m1 < charge_range:
@@ -440,9 +357,7 @@ with st.sidebar:
                             probs[neutral_index] = 0.2
                         else:
                             probs[neutral_index] = 1.0
-                            
                 elif template_type == "Basic sites (positive)":
-                    # Distribute probability towards positive charges
                     if current_max >= 2:
                         idx_p2 = index_for_charge(2, current_min)
                         idx_p1 = index_for_charge(1, current_min)
@@ -452,7 +367,6 @@ with st.sidebar:
                             probs[idx_p1] = 0.6
                         probs[neutral_index] = 0.2
                     else:
-                        # If range doesn't go to +2, distribute available positive charges
                         if current_max >= 1:
                             idx_p1 = index_for_charge(1, current_min)
                             if 0 <= idx_p1 < charge_range:
@@ -460,9 +374,8 @@ with st.sidebar:
                             probs[neutral_index] = 0.2
                         else:
                             probs[neutral_index] = 1.0
-                            
-                else:  # Mixed population
-                    if i % 3 == 0:  # Acidic sites
+                else:  # Mixed
+                    if i % 3 == 0:
                         if current_min <= -1:
                             probs[neutral_index - 1] = 0.4
                             probs[neutral_index] = 0.5
@@ -470,7 +383,7 @@ with st.sidebar:
                                 probs[neutral_index - 2] = 0.1
                         else:
                             probs[neutral_index] = 1.0
-                    elif i % 3 == 1:  # Basic sites
+                    elif i % 3 == 1:
                         if current_max >= 1:
                             probs[neutral_index + 1] = 0.4
                             probs[neutral_index] = 0.5
@@ -478,7 +391,7 @@ with st.sidebar:
                                 probs[neutral_index + 2] = 0.1
                         else:
                             probs[neutral_index] = 1.0
-                    else:  # Neutral sites
+                    else:
                         probs[neutral_index] = 0.8
                         if current_min <= -1:
                             idx_m1 = index_for_charge(-1, current_min)
@@ -488,18 +401,36 @@ with st.sidebar:
                             idx_p1 = index_for_charge(1, current_min)
                             if 0 <= idx_p1 < charge_range:
                                 probs[idx_p1] = 0.1
-                
+
                 template_data.append([site_id, copies] + probs)
-            
+
             template_df = pd.DataFrame(template_data, columns=DEFAULT_COLS)
             st.session_state.df = template_df
             st.success(f"✅ Generated {n_sites} {template_type.lower()}")
             st.rerun()
 
-    st.markdown("---")
-    st.header("Download (input)")
-    fname_base = st.text_input("Base filename (no extension)", value="ptm_input")
-    tol = float(st.text_input("Row-sum tolerance", value="1e-6"))
+    # Export / advanced options (collapsed)
+    with st.expander("Export / advanced", expanded=False):
+        fname_base = st.text_input("Base filename", value="ptm_input")
+        tol = float(st.text_input("Row-sum tolerance", value="1e-6"))
+
+    # Optional: move downloads into sidebar expander (user requested)
+    with st.expander("Downloads", expanded=False):
+        st.markdown("Download current input or a template from here.")
+        try:
+            df_for_download = st.session_state.get('df', pd.DataFrame())
+            if not df_for_download.empty:
+                csv_bytes = df_for_download[DEFAULT_COLS].to_csv(index=False).encode('utf-8')
+                st.download_button("Download input CSV", data=csv_bytes, file_name=f"{fname_base}.csv", mime="text/csv")
+
+                xlsx_buf = io.BytesIO()
+                with pd.ExcelWriter(xlsx_buf, engine="openpyxl") as writer:
+                    df_for_download[DEFAULT_COLS].to_excel(writer, index=False, sheet_name="PTM_Input")
+                st.download_button("Download input Excel", data=xlsx_buf.getvalue(), file_name=f"{fname_base}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            else:
+                st.info("No input data available to download yet.")
+        except Exception:
+            st.info("No input data available to download yet.")
 
 tabs = st.tabs(["📝 Input table", "🧮 Compute distribution"])
 
@@ -564,7 +495,7 @@ with tabs[0]:
     # Editor: use actual columns for editing and config
     edited = st.data_editor(
         display_df,
-        use_container_width=True,
+        width='stretch',
         num_rows="dynamic",
         column_config={
             "Status": st.column_config.TextColumn("✓", width="small", help="✅ = Valid row, ❌ = Invalid row"),
@@ -625,11 +556,11 @@ with tabs[0]:
                 st.markdown("**❌ Problematic rows (from table above):**")
                 st.dataframe(
                     problem_rows.style.format({"Prob_Sum": "{:.3f}", "Error": "{:+.3f}"}),
-                    use_container_width=True
+                    width='stretch'
                 )
 
     st.subheader("Preview (with validation)")
-    st.dataframe(edited, use_container_width=True)
+    st.dataframe(edited, width='stretch')
 
     col1, col2 = st.columns(2)
     with col1:
@@ -1126,7 +1057,7 @@ with tabs[1]:
                     combined_fig.update_layout(height=500)
                 elif plot_height == "Large":
                     combined_fig.update_layout(height=900)
-                st.plotly_chart(combined_fig, use_container_width=True, key="combined_plot")
+                st.plotly_chart(combined_fig, width='stretch', key="combined_plot")
                 
             elif plot_style == "Distribution only":
                 dist_fig = create_charge_distribution_plot(window_df, 
@@ -1135,20 +1066,20 @@ with tabs[1]:
                                                          total_sites)
                 height_map = {"Compact": 350, "Standard": 500, "Large": 650}
                 dist_fig.update_layout(height=height_map[plot_height])
-                st.plotly_chart(dist_fig, use_container_width=True, key="dist_plot")
+                st.plotly_chart(dist_fig, width='stretch', key="dist_plot")
                 
             elif plot_style == "Cumulative only":
                 cum_fig = create_cumulative_distribution_plot(window_df, tail_low, tail_high)
                 height_map = {"Compact": 300, "Standard": 400, "Large": 550}
                 cum_fig.update_layout(height=height_map[plot_height])
-                st.plotly_chart(cum_fig, use_container_width=True, key="cum_plot")
+                st.plotly_chart(cum_fig, width='stretch', key="cum_plot")
                 
             else:  # Site contributions
                 site_fig, show_warning = create_site_contribution_plot(df)
                 if site_fig is not None:
                     if show_warning:
                         st.info("ℹ️ Showing first 20 sites only for readability. All sites are still included in the overall calculation.")
-                    st.plotly_chart(site_fig, use_container_width=True, key="site_plot")
+                    st.plotly_chart(site_fig, width='stretch', key="site_plot")
                 else:
                     st.error("Cannot create site contribution plot - no probability data found.")
             
@@ -1199,7 +1130,7 @@ with tabs[1]:
                 else:
                     st.markdown("⚡ **Most likely charge is significant** - protein may have altered behavior")
             
-            st.dataframe(window_df, use_container_width=True)
+            st.dataframe(window_df, width='stretch')
 
             # Enhanced downloads with metadata
             st.subheader("📥 Download Results & Plots")
