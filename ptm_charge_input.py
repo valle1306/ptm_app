@@ -233,6 +233,9 @@ with st.sidebar:
     
     st.markdown("---")
 
+    # Table display size (users can adjust height for easier editing)
+    table_height = st.number_input("Table height (px)", min_value=200, max_value=1200, value=500, step=50, key="table_height")
+
     # Compact quick actions: N=100 generator + Insert N blank rows
     st.subheader("Quick Start")
     quick_left, quick_right = st.columns([2, 1])
@@ -409,13 +412,11 @@ with st.sidebar:
             st.success(f"✅ Generated {n_sites} {template_type.lower()}")
             st.rerun()
 
-    # Export / advanced options (collapsed)
-    with st.expander("Export / advanced", expanded=False):
+    # Export & downloads (collapsed into one expander for simplicity)
+    with st.expander("Export & downloads", expanded=False):
         fname_base = st.text_input("Base filename", value="ptm_input")
         tol = float(st.text_input("Row-sum tolerance", value="1e-6"))
 
-    # Optional: move downloads into sidebar expander (user requested)
-    with st.expander("Downloads", expanded=False):
         st.markdown("Download current input or a template from here.")
         try:
             df_for_download = st.session_state.get('df', pd.DataFrame())
@@ -495,6 +496,7 @@ with tabs[0]:
     edited = st.data_editor(
         display_df,
         width='stretch',
+        height=table_height,
         num_rows="dynamic",
         column_config={
             "Status": st.column_config.TextColumn("Status", width="small", help="✅ = Valid, ❌ = Invalid"),
@@ -512,21 +514,9 @@ with tabs[0]:
     editable_cols = [col for col in display_df.columns if col not in ("Status", "Prob_Sum")]
     st.session_state.df = edited[editable_cols].copy()
 
-    # Show a compact validation message
-    current_df = st.session_state.df.copy()
-    if prob_cols:
-        current_df["Prob_Sum"] = current_df[prob_cols].sum(axis=1)
-        valid_mask = np.isclose(current_df["Prob_Sum"].fillna(0.0), 1.0, atol=tol)
-    else:
-        valid_mask = np.array([False] * len(current_df))
-
-    bad_rows = np.count_nonzero(~valid_mask)
-    if bad_rows == 0:
-        st.success(f"Dataset ready: {len(current_df)} PTM sites, all valid")
-    else:
-        st.warning(f"{bad_rows} row(s) have probability sums ≠ 1 (they will be normalized during computation)")
-
-    # Downloads are available from the sidebar 'Downloads' expander to avoid duplication
+    # Note: validation/status is already shown at the top of the page (to avoid duplication
+    # we don't repeat the green confirmation here). Downloads remain available in the sidebar
+    # 'Downloads' expander.
 
 # -------------------------------
 # Helpers for Task 3 (PGF/PMF math)
