@@ -143,40 +143,76 @@ pip install streamlit>=1.28.0 pandas>=2.0.0 numpy>=1.24.0 plotly>=5.15.0 openpyx
 
 ### **System Requirements**
 - **Python**: 3.8+ (recommended: 3.11+)
-- **Memory**: 2GB RAM minimum (4GB+ for large datasets >200 sites)
-- **Browser**: Modern browser with JavaScript enabled for interactive plots
-- **OS**: Windows, macOS, or Linux
+ # PTM Charge Distribution Analyzer — Quick README
 
-### **Performance Benchmarks**
-- **Small datasets** (≤10 sites): Instant computation and visualization
-- **Medium datasets** (10-50 sites): <2 seconds for full analysis
-- **Large datasets** (50-100 sites): <5 seconds with interactive plots
-- **Very large datasets** (100+ sites): <10 seconds, optimized algorithms
+This repository runs a Streamlit app that computes overall protein net-charge distributions
+from per-site PTM charge-state probabilities. Most usage tips are shown inside the app's
+landing page; this README gives a short, focused run & quick-start guide.
 
-## 🆘 Troubleshooting
+## Quick start (Windows PowerShell)
 
-### **Common Issues**
-- **"Probabilities don't sum to 1"**: Check the Status column (❌) and use the built-in help guide
-- **Slow performance**: Reduce plot size to "Compact" for very large datasets
-- **CSV upload errors**: Ensure column names match exactly (case-sensitive)
-- **Plot not displaying**: Refresh browser or try a different plot type
+1) Activate the virtual environment (if you created one in this repo):
 
-### **Best Practices**
-- **Start with templates** then modify based on your experimental data
-- **Validate data early** using the real-time status indicators
-- **Use Combined view** for comprehensive analysis of new datasets
-- **Export interactive HTML** for sharing results with collaborators
-
-## 📚 Citation & Acknowledgments
-
-If you use this tool in your research, please cite:
-```
-PTM Charge Variant Input Application
-A computational tool for analyzing post-translational modification charge distributions
-GitHub: https://github.com/valle1306/ptm_app
+```powershell
+& .\\.venv\\Scripts\\Activate.ps1
 ```
 
-### **Contributions Welcome**
-- Report issues or request features via GitHub Issues
-- Contribute code improvements via Pull Requests
-- Share example datasets or PTM templates with the community
+2) Install dependencies (if not already installed):
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+3) Run the Streamlit app (recommended — uses the venv Python):
+
+```powershell
+python -m streamlit run ptm_charge_input_v2.py
+```
+
+If you see a launcher error like "Fatal error in launcher: Unable to create process", use the
+exact command above (`python -m streamlit ...`) instead of `streamlit run ...`. Reinstalling
+Streamlit inside the venv can also fix the Windows wrapper:
+
+```powershell
+python -m pip install --upgrade --force-reinstall streamlit
+```
+
+Open the displayed Local URL (e.g., http://localhost:8501) in your browser.
+
+## What to do in the app (short)
+
+- Landing page: short guide and tips.
+- Design Input tab:
+	- Select a charge range (3-state … 15-state).
+	- Use "📋 Generate N=100" to create a test template.
+	- Edit site rows in the table. Probability columns (P(...)) are highlighted.
+	- Each row shows a "Prob_Sum" and "Status" (✅ means the row sums to 1.0).
+- Compute & Visualize tab:
+	- Click ▶️ Compute Distribution Now to run the PGF/convolution engine.
+	- View combined Distribution + Cumulative plots, metrics, and a table of the central window.
+
+Notes:
+- If a row's probabilities don't sum to 1.0, the app will auto-normalize on compute (you'll be warned).
+- Default editor height is compact (300px) to reduce scrolling; you can still add/remove rows.
+
+## Quick troubleshooting
+
+- Streamlit launcher errors — use `python -m streamlit run ...` (see above).
+- Missing/incorrect probability columns — ensure column names like `P(-1)`, `P(0)`, `P(+1)` match the active range.
+- Very large datasets may take longer; the app is optimized for >100 sites but expect increased compute time.
+
+## Files you may care about
+
+- `ptm_charge_input_v2.py` — main Streamlit app (current development version).
+- `ptm_charge_input.py` — earlier/reference version.
+- `requirements.txt` — Python dependencies.
+- `Data/sample_ptm_n100.csv` — example dataset (100 sites).
+
+## Credits
+
+Developed by Valerie Le & Alex Goferman — MSDS Program, Rutgers University.
+
+---
+
+If you want, I can (a) trim or expand sections, (b) add copy for a public GitHub README, or
+(c) add an example command to run on a specific port. Tell me which and I'll update the README.
