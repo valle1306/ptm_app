@@ -962,20 +962,70 @@ with tabs[3]:
             
             pmf_enum, off_enum, enum_method = result_enum
             
+            # If enumeration succeeded but used sampling, we need to re-run Yergeev on the same subset for fair comparison
+            if pmf_enum is not None and enum_method == "sampled":
+                # Determine sample size used by enumeration
+                n_sites_in_data = len(df_for_val[df_for_val['Copies'].notna() & (df_for_val['Copies'] > 0)])
+                
+                # Re-run enumeration to get the actual sample size used
+                prob_cols_check = [col for col in df_for_val.columns if col.startswith("P(")]
+                charges_check = []
+                for col in prob_cols_check:
+                    charge_str = col[2:-1]
+                    if charge_str.startswith('+'):
+                        charges_check.append(int(charge_str[1:]))
+                    elif charge_str.startswith('-'):
+                        charges_check.append(-int(charge_str[1:]))
+                    else:
+                        charges_check.append(int(charge_str))
+                
+                # Try different sample sizes to find which one was used
+                sample_used = 8
+                for test_size in range(3, min(11, n_sites_in_data + 1)):
+                    test_combos = 1
+                    for _, row in df_for_val.iloc[:test_size].iterrows():
+                        if pd.notna(row.get("Copies")):
+                            copies = int(row["Copies"])
+                            if copies > 0:
+                                test_combos *= (len(prob_cols_check) ** copies)
+                    if test_combos <= 100000000:
+                        sample_used = test_size
+                        break
+                
+                # Re-run Yergeev on the same sample for fair comparison
+                df_for_comparison = df_for_val.iloc[:sample_used].copy()
+                t0_y2 = time.time()
+                pmf_yergeev_sampled, off_yergeev_sampled = yergeev_overall_charge_distribution(df_for_comparison)
+                time_yergeev_sampled = time.time() - t0_y2
+                
+                # Use sampled versions for comparison
+                pmf_yergeev_compare = pmf_yergeev_sampled
+                off_yergeev_compare = off_yergeev_sampled
+                time_yergeev_compare = time_yergeev_sampled
+                n_sites_compare = sample_used
+            else:
+                pmf_yergeev_compare = pmf_yergeev
+                off_yergeev_compare = off_yergeev
+                time_yergeev_compare = time_yergeev
+                n_sites_compare = len(df_for_val[df_for_val['Copies'].notna() & (df_for_val['Copies'] > 0)])
+            
             # Display timing metrics first
             st.markdown("### Performance Metrics")
             perf_col1, perf_col2, perf_col3 = st.columns(3)
             with perf_col1:
-                st.metric("Yergeev's Time", f"{time_yergeev*1000:.2f} ms", help="Iterative convolution (O(N×M²))")
+                st.metric("Yergeev's Time", f"{time_yergeev_compare*1000:.2f} ms", help="Iterative convolution (O(N×M²))")
             with perf_col2:
                 if pmf_enum is not None:
                     st.metric("Enumeration Time", f"{time_enum:.2f} s", help=f"Exhaustive method")
                 else:
                     st.metric("Enumeration Time", "Not available", help="Dataset too large")
             with perf_col3:
-                if pmf_enum is not None:
-                    speedup = time_enum / time_yergeev if time_yergeev > 0 else float('inf')
-                    st.metric("Speedup Ratio", f"{speedup:.0f}x faster", help="Enum / Yergeev")
+                if pmf_enum is not None and time_yergeev_compare > 0:
+                    speedup = time_enum / time_yergeev_compare
+                    if speedup >= 1:
+                        st.metric("Speedup Ratio", f"{speedup:.1f}x slower", help="Enumeration slower (as expected)")
+                    else:
+                        st.metric("Speedup Ratio", f"{1/speedup:.1f}x faster", help="Yergeev faster")
                 else:
                     st.metric("Speedup Ratio", "N/A", help="Enumeration not available")
             
@@ -998,20 +1048,20 @@ with tabs[3]:
                     Recommendation: Use Yergeev's method for production—it scales to 100+ sites efficiently.
                     """)
             else:
-                # Compare results
+                # Compare results (now using same data for both)
                 st.success("Both methods completed successfully!")
                 
                 # Show which method was used for enumeration
                 if enum_method == "sampled":
-                    st.info("Enumeration used sampling: validated on first ~10 sites, results extrapolated")
+                    st.info(f"Enumeration used sampling: validated on first {n_sites_compare} sites, Yergeev re-run on same subset for fair comparison")
                 
                 # Get window distributions for both
-                window_yergeev, tail_y_low, tail_y_high = window_distribution(pmf_yergeev, off_yergeev, -5, +5)
+                window_yergeev_cmp, tail_y_low, tail_y_high = window_distribution(pmf_yergeev_compare, off_yergeev_compare, -5, +5)
                 window_enum, tail_e_low, tail_e_high = window_distribution(pmf_enum, off_enum, -5, +5)
                 
                 # Compute metrics
-                max_diff = np.max(np.abs(window_yergeev['Probability'].values - window_enum['Probability'].values))
-                rmse = np.sqrt(np.mean((window_yergeev['Probability'].values - window_enum['Probability'].values)**2))
+                max_diff = np.max(np.abs(window_yergeev_cmp['Probability'].values - window_enum['Probability'].values))
+                rmse = np.sqrt(np.mean((window_yergeev_cmp['Probability'].values - window_enum['Probability'].values)**2))
                 
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
@@ -1021,16 +1071,16 @@ with tabs[3]:
                 with col3:
                     st.metric("Yergeev Match", "Yes" if max_diff < 1e-6 else "Check")
                 with col4:
-                    st.metric("Data Points", len(window_yergeev))
+                    st.metric("Data Points", len(window_yergeev_cmp))
                 
                 st.markdown("---")
                 
                 # Side-by-side comparison table
                 comparison_df = pd.DataFrame({
-                    "Charge": window_yergeev['Charge'],
-                    "Yergeev's Method": window_yergeev['Probability'],
+                    "Charge": window_yergeev_cmp['Charge'],
+                    "Yergeev's Method": window_yergeev_cmp['Probability'],
                     "Enumeration": window_enum['Probability'],
-                    "Difference": np.abs(window_yergeev['Probability'].values - window_enum['Probability'].values)
+                    "Difference": np.abs(window_yergeev_cmp['Probability'].values - window_enum['Probability'].values)
                 })
                 
                 st.subheader("Side-by-Side Probability Comparison")
@@ -1045,7 +1095,7 @@ with tabs[3]:
                 with comp_col1:
                     st.markdown("**Yergeev's Method (Production)**")
                     st.markdown(f"""
-                    - Fast: {time_yergeev*1000:.2f} ms for this dataset
+                    - Fast: {time_yergeev_compare*1000:.2f} ms for this dataset ({n_sites_compare} sites)
                     - Efficient: O(N × M) where N = sites, M = charge states
                     - Scalable: Handles 100+ sites easily
                     - Accurate: Mathematically rigorous convolution
