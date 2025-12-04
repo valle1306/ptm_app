@@ -132,7 +132,8 @@ You cannot use just individual files. The app depends on the project structure.
 - App is ready to use
 
 **Option B: Manual Launch**
-- Double-click `run_protonpulse.bat` in the main folder
+- Open a terminal or PowerShell window in the main folder
+- Run: `.venv\Scripts\python.exe -m streamlit run ptm_charge_input_v2.py`
 - Browser opens automatically
 
 For more details, see [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md)
@@ -292,8 +293,7 @@ ProtonPulse/
 │   ├── setup_env.ps1              ← Run once (installs dependencies)
 │   └── create_shortcut.ps1        ← Run once (makes desktop shortcut)
 │
-├── 🚀 run_protonpulse.bat         ← Launch app (double-click)
-├── 🚀 run_protonpulse.ps1         ← Alternative launcher
+// ...existing code...
 │
 ├── 💻 ptm_charge_input_v2.py      ← Main Streamlit app
 ├── 🧮 advanced_algorithms.py      ← Computation backend
@@ -356,6 +356,6 @@ MSDS Program, Rutgers University
 
 1. **Extract the repo** (download ZIP and extract)
 2. **Follow installation** (see above or [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md))
-3. **Launch the app** (click desktop shortcut or `run_protonpulse.bat`)
+3. **Launch the app** (click desktop shortcut or run the Streamlit command manually)
 4. **Read Welcome tab** (in-app tutorial with examples)
 5. **Start analyzing!** (upload CSV or use template)

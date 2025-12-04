@@ -118,9 +118,6 @@ ProtonPulse/
 ├── QUICKSTART.md (read this)
 ├── README.md (technical details)
 │
-├── run_protonpulse.bat (launcher - don't edit)
-├── run_protonpulse.ps1 (launcher - don't edit)
-│
 ├── ptm_charge_input_v2.py (main app - don't edit)
 ├── advanced_algorithms.py (backend - don't edit)
 │
@@ -132,7 +129,7 @@ ProtonPulse/
 │   └── (helper scripts)
 │
 └── .venv/
-    └── (installed Python packages - don't touch)
+   └── (installed Python packages - don't touch)
 ```
 
 ---
@@ -227,14 +224,7 @@ If you prefer the command line:
 
 ```powershell
 cd C:\Path\To\ProtonPulse
-.\run_protonpulse.bat
-```
-
-Or with PowerShell:
-
-```powershell
-cd C:\Path\To\ProtonPulse
-.\run_protonpulse.ps1
+.venv\Scripts\python.exe -m streamlit run ptm_charge_input_v2.py
 ```
 
 ### Command-Line Flags
@@ -309,7 +299,7 @@ To deploy ProtonPulse across your organization:
 
 1. Extract to a shared network drive
 2. Run `setup_env.ps1` once (creates `.venv` folder)
-3. Create shortcuts pointing to `run_protonpulse.bat`
+3. Create shortcuts pointing to the ProtonPulse desktop shortcut
 4. Users can then launch without installing anything
 
 ### Silent Installation
