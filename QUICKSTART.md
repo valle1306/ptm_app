@@ -1,214 +1,413 @@
-# ProtonPulse - Quick Start Guide
+# ProtonPulse - Detailed Usage Guide
 
-**For Bench Scientists & Lab Researchers**
+**For users who want to understand the app in depth**
 
-This guide assumes you've already completed the one-time installation. If not, see the `INSTALL/INSTALLATION_GUIDE.md` first.
-
----
-
-## ⚡ The Fast Version (TL;DR)
-
-**Every time you want to use ProtonPulse:**
-
-1. **Double-click the "ProtonPulse" shortcut on your desktop**
-2. Wait ~5 seconds
-3. Browser opens automatically
-4. Start analyzing!
-
-**That's it.** No terminal, no commands, no setup—just click.
+> **First time?** Read `README.md` first for setup and overview.
 
 ---
 
-## 🎯 First Time Setup
+## Table of Contents
 
-If you don't see a "ProtonPulse" shortcut on your desktop yet:
-
-1. Open the `ProtonPulse` folder
-2. Go to the `INSTALL` subfolder
-3. Double-click: `create_shortcut.ps1`
-4. Check your desktop—shortcut is there!
+1. [Complete Workflow with Examples](#complete-workflow)
+2. [Data Format & Templates](#data-format)
+3. [In-App Features](#in-app-features)
+4. [Results Interpretation](#results)
+5. [Advanced Tips](#advanced)
+6. [For Developers](#developers)
 
 ---
 
-## 📊 Using the App
+## Complete Workflow
 
-### The Four Tabs
+### Start to Finish: A Real Example
 
-#### 1️⃣ Welcome (`🏠`)
-- Learn what ProtonPulse does
-- See algorithm explanations
-- Read example use cases
+Let's say you're analyzing a protein with 3 phosphorylation sites and want to understand its charge distribution.
 
-#### 2️⃣ Data Input (`📝`)
-- **Upload a CSV file** (if you have one)
-- **OR edit example data** directly in the app
-- **OR download a template**, edit in Excel, upload back
+#### Phase 1: Prepare Data
 
-**Example CSV format:**
+**Option A: Use a CSV file you already have**
+- Make sure it has columns: `Site_ID`, `Copies`, `P(-2)`, `P(-1)`, `P(0)`, `P(+1)`, `P(+2)`
+- Save as `.csv` (not `.xlsx`)
+
+**Option B: Create from template**
+1. Open ProtonPulse (double-click shortcut)
+2. Go to **📝 Data Input** tab
+3. Click **📋 Download Template**
+4. Open in Excel
+5. Fill in your data:
+   ```
+   Site_ID,Copies,P(-2),P(-1),P(0),P(+1),P(+2)
+   Phos_Site1,1,0.0,0.0,1.0,0.0,0.0
+   Phos_Site2,1,0.0,0.3,0.6,0.1,0.0
+   Phos_Site3,1,0.0,0.0,0.8,0.2,0.0
+   ```
+6. Save as `.csv`
+7. Go back to ProtonPulse and upload
+
+**Option C: Edit example data directly in the app**
+1. The app comes with example data pre-loaded
+2. Click the data table in **📝 Data Input** to edit directly
+3. Click cells to change probability values
+
+#### Phase 2: Generate Results
+
+1. Go to **📊 Compute & Visualize** tab
+2. Select your preferred charge range (default: -5 to +5)
+3. Click **🚀 Compute Distribution**
+4. **Instant results:**
+   - Bar chart of charge distribution
+   - Cumulative line plot
+   - Summary statistics
+
+#### Phase 3: Download & Analyze
+
+1. Scroll down to see detailed results
+2. Click **📥 Download CSV** to save results
+3. Use downloaded file in Excel, papers, presentations
+
+#### Phase 4: Validate (Optional)
+
+1. Go to **✅ Validate** tab
+2. Choose a validation method
+3. Compare your results against benchmarks
+4. Verify accuracy
+
+---
+
+## Data Format
+
+### Required Columns
+
+Your CSV **must** have these exact columns (case-sensitive):
+
+| Column | Type | Description | Example |
+|--------|------|-------------|---------|
+| `Site_ID` | Text | Name of PTM site | "Phospho_S123" |
+| `Copies` | Number | How many times this site appears | 1, 2, 3... |
+| `P(-2)` | Decimal | Probability of -2 charge | 0.0 - 1.0 |
+| `P(-1)` | Decimal | Probability of -1 charge | 0.0 - 1.0 |
+| `P(0)` | Decimal | Probability of 0 charge (neutral) | 0.0 - 1.0 |
+| `P(+1)` | Decimal | Probability of +1 charge | 0.0 - 1.0 |
+| `P(+2)` | Decimal | Probability of +2 charge | 0.0 - 1.0 |
+
+### Data Rules
+
+**Probabilities must sum to 1.0 for each site:**
+```
+✅ CORRECT:   0.0 + 0.2 + 0.6 + 0.2 + 0.0 = 1.0
+❌ WRONG:     0.0 + 0.2 + 0.6 + 0.1 + 0.0 = 0.9
+```
+
+**Copies must be positive integers:**
+```
+✅ CORRECT:   Copies = 1, 2, 3, 100
+❌ WRONG:     Copies = 0, 1.5, -1
+```
+
+### Example CSV
+
 ```
 Site_ID,Copies,P(-2),P(-1),P(0),P(+1),P(+2)
 Site_1,1,0.0,0.0,1.0,0.0,0.0
-Site_2,1,0.0,0.2,0.6,0.2,0.0
+Site_2,1,0.0,0.1,0.8,0.1,0.0
 Site_3,2,0.0,0.0,1.0,0.0,0.0
+Acetyl_K,1,0.0,0.0,0.7,0.3,0.0
 ```
 
-#### 3️⃣ Compute (`📊`)
-- Click the **"🚀 Compute Distribution"** button
-- See instant results:
-  - Bar charts (probability distribution)
-  - Line chart (cumulative distribution)
-  - Summary statistics
-  - Download results as CSV
+**Meaning:** 
+- Site_1: Always neutral (100% P(0))
+- Site_2: Mostly neutral (80%), slight variations
+- Site_3: Appears twice, always neutral
+- Acetyl_K: Can be neutral or +1
 
-#### 4️⃣ Validate (`✅`)
-- Compare different calculation methods
-- Verify accuracy of results
-- For verification purposes only
+### Charge Range Options
+
+The app supports different charge ranges. Download the correct template for your needs:
+
+| Range | States | Template | When to Use |
+|-------|--------|----------|-------------|
+| -1 to +1 | 3 | Minimal (basic PTMs) |
+| -2 to +2 | 5 | Default (most common) |
+| -3 to +3 | 7 | Large proteins |
+| -5 to +5 | 11 | Complex PTM scenarios |
+| Custom | Any | User-defined | Extreme cases |
 
 ---
 
-## 🔄 Typical Workflow
+## In-App Features
 
-### Scenario: You have a protein with PTM sites
+### Tab 1: 🏠 Welcome
+
+**What it contains:**
+- Overview of what ProtonPulse does
+- Algorithm explanations
+- Example use cases
+- Links to this guide
+
+**When to use:** First time opening the app
+
+### Tab 2: 📝 Data Input
+
+**What it contains:**
+- CSV file uploader
+- Template downloader
+- Data editor (click cells to edit)
+- Charge range selector
+
+**Key actions:**
+1. **Upload CSV** → Click "📤 Upload CSV" and choose your file
+2. **Download Template** → Click "📋 Download Template" for blank CSV
+3. **Edit Directly** → Click data cells to change values
+4. **Change Range** → Select different -N to +N range if needed
+
+**Tips:**
+- Template format is easiest if you have data in Excel
+- Charge range locks once you upload CSV (prevents accidental reset)
+- "Reset to Example" button restores demo data
+
+### Tab 3: 📊 Compute & Visualize
+
+**What it contains:**
+- Charge range selector
+- Compute button
+- Results visualization
+- Download button
+
+**The results show:**
+1. **Bar Chart** - Probability at each charge state
+2. **Cumulative Chart** - Cumulative probability
+3. **Summary Statistics:**
+   - Most likely charge (mode)
+   - Peak probability
+   - Mean charge
+   - Standard deviation
+   - Tail probabilities
+
+**Colors in charts:**
+- 🔴 Red: Very negative (< -2)
+- 🟠 Orange: Negative (-2 to -1)
+- 🟢 Green: Neutral (0)
+- 🔵 Blue: Positive (+1 to +2)
+- 🟣 Purple: Very positive (> +2)
+
+### Tab 4: ✅ Validate
+
+**What it contains:**
+- Validation method selector
+- Benchmark datasets
+- Accuracy metrics
+- Comparison visualizations
+
+**Use this to:**
+- Verify your algorithm works correctly
+- Compare different charge ranges
+- Test edge cases
+- Build confidence in results
+
+---
+
+## Understanding Results
+
+### What Does the Output Mean?
+
+#### Bar Chart
+- **X-axis:** Total charge of protein
+- **Y-axis:** Probability (0% to 100%)
+- **Bars:** Show likelihood of each charge
+
+**Example interpretation:**
+```
+Charge +2 has height 0.35 → 35% chance protein has charge +2
+Charge -1 has height 0.12 → 12% chance protein has charge -1
+```
+
+#### Statistics
+
+**Most Likely Charge (Mode)**
+- The charge state with highest probability
+- If result shows "+1", the protein is most likely positively charged
+
+**Peak Probability**
+- The highest bar in the chart
+- Higher = more certain that charge occurs
+- Lower = charge distribution is spread out
+
+**Mean Charge**
+- Average charge across all possibilities
+- Positive = net positive charge
+- Negative = net negative charge
+
+#### Cumulative Distribution
+- Shows percentage of probability "up to" each charge
+- Useful for understanding range (e.g., "80% chance charge is -3 to +3")
+
+---
+
+## Advanced Tips
+
+### Tip 1: Large vs. Small Datasets
+
+The app automatically picks the best algorithm:
+
+**Small data (≤50 copies):** Uses exact convolution
+- Results are mathematically guaranteed correct
+- Fast computation
+
+**Large data (>200 copies):** Uses Gaussian approximation
+- Trades some precision for speed
+- Still very accurate for most purposes
+
+**Check which was used:** Look at the "Algorithm Used" line in results
+
+### Tip 2: Multiple Sites with Different Copy Numbers
+
+You can specify different copy numbers for different modifications:
 
 ```
-Step 1: Click "📝 Data Input" tab
-
-Step 2: OPTION A - Use Your Own Data
-        - Click "📤 Upload CSV"
-        - Select your file
-        - App auto-detects format
-        
-        OR OPTION B - Use Template
-        - Click "📋 Download Template"
-        - Edit in Excel (add your sites)
-        - Save and upload back
-        
-        OR OPTION C - Edit Directly
-        - Edit the example data in the table
-        - Add/remove rows as needed
-
-Step 3: Click "📊 Compute & Visualize" tab
-
-Step 4: Click "🚀 Compute Distribution" button
-
-Step 5: See Results!
-        - Graph of charge distribution
-        - Summary statistics (most likely charge, etc.)
-        - Download button for CSV results
-
-Step 6: (Optional) Expand "View Full Distribution"
-        - See charges beyond -5 to +5 range
-        - Download full results if needed
+Phos_Site1,1,...    ← Appears 1 time
+Acetyl_K,2,...      ← Appears 2 times
+Ubiquitin,5,...     ← Appears 5 times
 ```
 
----
+The tool multiplies probabilities correctly for each copy number.
 
-## 💾 About Your Data
+### Tip 3: Probability Distribution Shapes
 
-| Question | Answer |
-|----------|--------|
-| **Where is my data stored?** | Only in your browser (temporary) |
-| **Is it uploaded to the cloud?** | No, never |
-| **Can the app see my files?** | Only what you upload to it |
-| **What happens when I close?** | Everything is deleted |
-| **Is it private?** | Yes, 100% |
-
----
-
-## ⚙️ Settings & Options
-
-### In the "Data Input" tab:
-
-- **Charge Range**: Select from 3-state to 21-state (default: 5-state)
-- **Load 100-site template**: Quick test with 100 sample sites
-- **Reset to default**: Go back to original example
-- **Edit probabilities**: Click cells in the table to change values
-
-### In the "Compute" tab:
-
-- **View Full Distribution**: Expand to see all charge states (beyond -5 to +5)
-- **Download results**: Click to save as CSV
-
----
-
-## 🆘 Quick Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| **App doesn't open** | Double-click shortcut again, wait 10 sec |
-| **CSV won't upload** | Download template and use that format |
-| **Numbers look wrong** | Make sure probabilities sum to 1.0 in each row |
-| **Need to stop the app** | Close the browser and terminal |
-| **Port error (8501 in use)** | Close other ProtonPulse windows |
-
-**For detailed troubleshooting, see:** `INSTALL/INSTALLATION_GUIDE.md`
-
----
-
-## 📚 More Help
-
-- **Full installation guide**: `INSTALL/INSTALLATION_GUIDE.md`
-- **Technical details**: `README.md`
-- **Questions?** Email the development team
-
----
-
-## 🎓 Understanding the Results
-
-### What is "Charge Distribution"?
-
-Each PTM site can be in different charge states (e.g., -2, -1, 0, +1, +2).
-
-The app calculates: **For all possible combinations of charges across all sites, what's the probability of each total charge?**
-
-### The Graph
-
-- **X-axis**: Total charge (e.g., -5 to +5)
-- **Y-axis**: Probability (0% to 100%)
-- **Bars colored by**:
-  - 🔴 Red = Very negative (< -2)
-  - 🟠 Orange = Negative (-2 to -1)
-  - 🟢 Green = Neutral (0)
-  - 🔵 Blue = Positive (+1 to +2)
-  - 🟣 Purple = Very positive (> +2)
-
-### Summary Statistics
-
-- **Most Likely Charge**: The peak of the distribution (highest probability)
-- **Peak Prob**: The probability at that peak
-- **Central Mass**: Percentage of probability in the main range (-5 to +5)
-- **Tails**: Probability at extreme charges
-
----
-
-## 💡 Tips & Tricks
-
-1. **Keep files organized**: Save templates in a folder like `C:\PTM_Data\`
-
-2. **Edit in Excel**: Download template → Edit → Upload (easier than clicking cells)
-
-3. **Test with different ranges**: Try 5-state vs 11-state to see differences
-
-4. **Download for sharing**: Export results as CSV to share with colleagues
-
-5. **Use validation tab**: Run comparison if you want to verify results
-
----
-
-## 🔧 Advanced: If You Know Command Line
-
-```powershell
-# Run app from terminal (instead of shortcut)
-cd C:\Path\To\ProtonPulse
-.\run_protonpulse.bat
-
-# Or with PowerShell
-.\run_protonpulse.ps1
+**Uniform distribution:**
 ```
+P(-2)=0.2, P(-1)=0.2, P(0)=0.2, P(+1)=0.2, P(+2)=0.2
+```
+→ Result: Very spread-out distribution
+
+**Narrow distribution:**
+```
+P(-2)=0.0, P(-1)=0.0, P(0)=0.95, P(+1)=0.05, P(+2)=0.0
+```
+→ Result: Sharp peak at charge 0
+
+### Tip 4: Validation for Confidence
+
+Always validate if possible:
+1. Use validation tab with test datasets
+2. Compare against published data
+3. Run with different charge ranges
+4. Check if results make biological sense
+
+### Tip 5: Download Format
+
+Downloaded CSV contains:
+- Column 1: Charge value
+- Column 2: Probability (as decimal)
+- Column 3: Probability (as percentage)
+- Column 4: Cumulative probability
+
+**Use in Excel:**
+- Charts → Create visualizations
+- Formulas → Calculate statistics
+- Pivot tables → Analyze subsets
+
+---
+
+## For Developers
+
+### Modifying the App
+
+ProtonPulse is open-source (MIT License). You can modify the code:
+
+**Main files:**
+- `ptm_charge_input_v2.py` — UI and app logic
+- `advanced_algorithms.py` — Computation backend
+
+**To modify:**
+1. Edit the Python files
+2. Run: `streamlit run ptm_charge_input_v2.py`
+3. Changes reload automatically
+
+### Adding Custom Charge Ranges
+
+Edit `ptm_charge_input_v2.py`, find this section:
+
+```python
+charge_options = {
+    "3-state (-1 to +1)": (-1, 1),
+    "5-state (-2 to +2)": (-2, 2),
+    # Add your own:
+    "Custom Range": (-4, +3),
+}
+```
+
+### Custom Algorithms
+
+To add a new algorithm, edit `advanced_algorithms.py` and add a function:
+
+```python
+def my_algorithm(sites_data, charge_range):
+    """Your algorithm here"""
+    return probability_distribution
+```
+
+Then integrate into the selector in `ptm_charge_input_v2.py`.
+
+### Command-Line Usage
+
+For batch processing:
+
+```bash
+python ptm_charge_input_v2.py --input data.csv --output results.csv
+```
+
+(Requires custom command-line interface—see GitHub for examples)
+
+---
+
+## Troubleshooting Reference
+
+### "My probabilities don't sum to 1.0"
+
+**What's happening:** You entered 0.2 + 0.3 + 0.3 + 0.1 = 0.9
+
+**Fix:**
+- Adjust one probability to make sum = 1.0
+- (0.2 + 0.3 + 0.3 + 0.2 = 1.0) ✓
+
+### "Results look wrong"
+
+**Check:**
+1. Did you validate with known test data first?
+2. Are your probabilities correct?
+3. Did you use the right charge range?
+
+**Validate:** Use the "✅ Validate" tab
+
+### "CSV won't upload"
+
+**Check:**
+- Column names exactly match: `Site_ID`, `Copies`, `P(-2)`, etc.
+- All probabilities are decimals (0.0 to 1.0)
+- File is `.csv` not `.xlsx`
+
+**Try:** Download template from app and use that format
+
+### "Different result than expected"
+
+**Possible causes:**
+1. You calculated by hand and made an error
+2. Different algorithm selected (try validation tab)
+3. Charge range different than expected
+
+**Verify:** Use validation with known-good data
+
+---
+
+## Questions?
+
+- **Setup issues:** See `INSTALL/INSTALLATION_GUIDE.md`
+- **Algorithm details:** See `README.md` or in-app Welcome tab
+- **Feature requests:** Submit on GitHub
+- **Bug reports:** Contact development team
 
 ---
 
 **Version:** 2.3 | December 2025
 
-**Questions?** See the INSTALL folder or check README.md
+**For more info:** See README.md or launch the app and check the Welcome tab
