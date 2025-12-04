@@ -17,8 +17,8 @@ Calculate charge variant distributions for post-translationally modified protein
 
 **Windows:**
 1. **Download & extract** this repo (`Code` → `Download ZIP`)
-2. **Run once:** Double-click `INSTALL/setup_env.ps1` (installs Python dependencies)
-3. **Then every time:** Double-click the desktop shortcut created by `INSTALL/create_shortcut.ps1`
+2. **Run once:** On Windows, right-click `INSTALL/setup_env.ps1` and select "Run with PowerShell" (installs Python dependencies). On Mac/Linux, open a terminal and run the script as described in the Advanced section.
+3. **Then every time:** On Windows, right-click `INSTALL/create_shortcut.ps1` and select "Run with PowerShell" to create the desktop shortcut. On Mac/Linux, use the terminal as described in the Advanced section.
 4. **App opens automatically** in your browser — start analyzing!
 
 **Mac/Linux:**
@@ -114,14 +114,14 @@ You cannot use just individual files. The app depends on the project structure.
 
 **Step 2: Install Python Dependencies** (requires internet)
 1. Navigate into the extracted folder
-2. Double-click: `INSTALL/setup_env.ps1`
-3. PowerShell window opens showing installation progress
-4. Wait until you see: "✅ Setup complete!"
+2. On Windows: Right-click `INSTALL/setup_env.ps1` and select "Run with PowerShell". On Mac/Linux: Open a terminal and run the script as described in the Advanced section.
+3. PowerShell/terminal window opens showing installation progress
+4. Wait until you see: "Setup complete!"
 5. Close the window
 
 **Step 3: Create Desktop Shortcut** (optional but recommended)
-1. Double-click: `INSTALL/create_shortcut.ps1`
-2. A "ProtonPulse" shortcut appears on your desktop
+1. On Windows: Right-click `INSTALL/create_shortcut.ps1` and select "Run with PowerShell". On Mac/Linux: Use the terminal as described in the Advanced section.
+2. A "ProtonPulse" shortcut appears on your desktop (Windows only)
 3. Done!
 
 ### Running the App
@@ -239,7 +239,7 @@ See [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md) for extended 
 cd path\to\ProtonPulse
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+   pip install -r INSTALL/requirements.txt
 streamlit run ptm_charge_input_v2.py
 ```
 
@@ -256,7 +256,7 @@ ProtonPulse is Windows-optimized, but can run on Linux/Mac:
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+   pip install -r INSTALL/requirements.txt
 streamlit run ptm_charge_input_v2.py
 ```
 

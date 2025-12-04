@@ -35,7 +35,7 @@ ProtonPulse is a PTM Charge Distribution Analyzer that calculates charge variant
 This runs on its own. Just watch the terminal.
 
 **Option A - Automatic (Easiest):**
-1. In the `ProtonPulse` folder, double-click: `setup_env.ps1`
+1. In the `ProtonPulse` folder, right-click `setup_env.ps1` and select "Run with PowerShell" (Windows). On Mac/Linux, open a terminal and run the script as described in the Advanced section.
 2. A terminal will open and start installing
 3. Wait until you see:
    ```
@@ -59,12 +59,9 @@ This runs on its own. Just watch the terminal.
 
 ### First Time: Create Desktop Shortcut
 
-In the `ProtonPulse` folder, double-click:
-```
-create_shortcut.ps1
-```
+In the `ProtonPulse` folder, right-click `create_shortcut.ps1` and select "Run with PowerShell" (Windows). On Mac/Linux, use the terminal as described in the Advanced section.
 
-This creates a "ProtonPulse" icon on your desktop.
+This creates a "ProtonPulse" icon on your desktop (Windows only).
 
 ### Every Other Time: Just Click!
 
@@ -115,7 +112,8 @@ ProtonPulse/
 ├── INSTALL/
 │   ├── INSTALLATION_GUIDE.md (this file)
 │   ├── setup_env.ps1 (run once)
-│   └── create_shortcut.ps1 (run once)
+│   ├── create_shortcut.ps1 (run once)
+│   └── requirements.txt (Python dependencies)
 │
 ├── QUICKSTART.md (read this)
 ├── README.md (technical details)
@@ -250,6 +248,27 @@ If you want to customize the app:
 ```
 
 (Changes the port from 8501 to 9000)
+
+### Manual Setup (Command Line)
+
+```powershell
+cd path\to\ProtonPulse
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r INSTALL/requirements.txt
+streamlit run ptm_charge_input_v2.py
+```
+
+### Linux/Mac Installation
+
+ProtonPulse is Windows-optimized, but can run on Linux/Mac:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r INSTALL/requirements.txt
+streamlit run ptm_charge_input_v2.py
+```
 
 ---
 
