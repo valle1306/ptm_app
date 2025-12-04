@@ -25,10 +25,17 @@ if (Test-Path $venvPython) {
     Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Gray
     Write-Host ""
     
-    # Run streamlit using python -m (more reliable than .exe)
+    # Kill any existing Streamlit processes on port 8501
+    Get-Process | Where-Object {$_.ProcessName -eq "python"} | Where-Object {$_.CommandLine -match "streamlit"} | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+    
+    # Run streamlit with proper flags to prevent reload loops
     & $venvPython -m streamlit run ptm_charge_input_v2.py `
         --server.port 8501 `
-        --browser.gatherUsageStats false
+        --server.headless false `
+        --browser.gatherUsageStats false `
+        --logger.level=error `
+        --client.toolbarMode "minimal"
     
     # If we get here, streamlit stopped
     Write-Host ""

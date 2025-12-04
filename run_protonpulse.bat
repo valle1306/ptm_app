@@ -14,7 +14,10 @@ if exist ".venv\Scripts\python.exe" (
     echo.
     echo Press Ctrl+C to stop the server
     echo.
-    .venv\Scripts\python.exe -m streamlit run ptm_charge_input_v2.py --server.port 8501 --browser.gatherUsageStats false
+    REM Kill any existing Streamlit processes
+    taskkill /F /IM python.exe /FI "WINDOWTITLE eq ProtonPulse*" >nul 2>&1
+    timeout /t 1 /nobreak >nul
+    .venv\Scripts\python.exe -m streamlit run ptm_charge_input_v2.py --server.port 8501 --server.headless false --browser.gatherUsageStats false --logger.level=error --client.toolbarMode "minimal"
     echo.
     echo ProtonPulse stopped.
 ) else (
