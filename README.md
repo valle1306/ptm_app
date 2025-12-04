@@ -13,12 +13,18 @@ Calculate charge variant distributions for post-translationally modified protein
 
 ## ⚡ TL;DR (Quick Start)
 
-**For Windows bench scientists:**
+**For Windows, Mac, and Linux bench scientists:**
 
+**Windows:**
 1. **Download & extract** this repo (`Code` → `Download ZIP`)
 2. **Run once:** Double-click `INSTALL/setup_env.ps1` (installs Python dependencies)
 3. **Then every time:** Double-click the desktop shortcut created by `INSTALL/create_shortcut.ps1`
 4. **App opens automatically** in your browser — start analyzing!
+
+**Mac/Linux:**
+1. **Download & extract** this repo (`Code` → `Download ZIP`)
+2. Open a terminal and follow the steps in the [Advanced (For Developers)](#advanced-for-developers) section below
+3. App opens automatically in your browser — start analyzing!
 
 **Need details?** See [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md)
 
@@ -74,11 +80,12 @@ This is critical for understanding:
 
 ## Installation & Setup
 
+
 ### System Requirements
 
 | Requirement | Specification |
 |---|---|
-| **OS** | Windows 10 or 11 |
+| **OS** | Windows 10/11, macOS, or Linux (Windows instructions are easiest; see Advanced section for Mac/Linux) |
 | **Storage** | ~500 MB (one-time) |
 | **RAM** | 4 GB minimum (8 GB recommended) |
 | **Internet** | ✅ Required for setup **ONLY**<br>❌ NOT needed to run the app |
@@ -318,7 +325,7 @@ ProtonPulse/
 A: No! ProtonPulse is designed for lab scientists. Just click buttons and upload files.
 
 **Q: Can I use this on Mac/Linux?**  
-A: Yes, but instructions are optimized for Windows. Follow the "Advanced" section above.
+A: Yes! ProtonPulse works on Mac and Linux. Instructions are optimized for Windows, but Mac/Linux users can follow the [Advanced (For Developers)](#advanced-for-developers) section for setup.
 
 **Q: Can I modify the code?**  
 A: Yes! MIT License allows modification. See [QUICKSTART.md](QUICKSTART.md) for insights into the codebase.

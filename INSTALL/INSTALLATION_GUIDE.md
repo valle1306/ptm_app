@@ -1,4 +1,4 @@
-# 🚀 ProtonPulse Installation Guide
+# ProtonPulse Installation Guide
 
 **For: Bench Scientists & Lab Researchers**
 
@@ -6,7 +6,7 @@
 
 ## What is ProtonPulse?
 
-ProtonPulse is a **PTM Charge Distribution Analyzer** that calculates charge variant distributions for post-translationally modified proteins. No coding required—just point, click, and analyze!
+ProtonPulse is a PTM Charge Distribution Analyzer that calculates charge variant distributions for post-translationally modified proteins. No coding required—just point, click, and analyze!
 
 **Version:** 2.3 | December 2025
 
@@ -16,7 +16,7 @@ ProtonPulse is a **PTM Charge Distribution Analyzer** that calculates charge var
 
 | Requirement | Specification |
 |---|---|
-| **Operating System** | Windows 10 or 11 |
+| **Operating System** | Windows 10/11, macOS, or Linux |
 | **Disk Space** | ~500 MB (one-time setup) |
 | **RAM** | 4 GB minimum (8 GB recommended) |
 | **Internet** | Required for first-time setup only |
@@ -27,26 +27,26 @@ ProtonPulse is a **PTM Charge Distribution Analyzer** that calculates charge var
 
 ### Step 1: Extract Files
 1. Download `ProtonPulse_Setup.zip`
-2. Right-click → **Extract All**
+2. Right-click → Extract All
 3. Choose a location (e.g., `C:\ProtonPulse` or `C:\Users\YourName\Documents\ProtonPulse`)
 4. Open the extracted `ProtonPulse` folder
 
 ### Step 2: Install Dependencies
-**This runs on its own. Just watch the terminal.**
+This runs on its own. Just watch the terminal.
 
 **Option A - Automatic (Easiest):**
 1. In the `ProtonPulse` folder, double-click: `setup_env.ps1`
 2. A terminal will open and start installing
-3. **Wait** until you see:
+3. Wait until you see:
    ```
-   ✅ Setup complete! Press Enter to close.
+   Setup complete! Press Enter to close.
    ```
 4. Press Enter
-5. **Done!** You only do this once.
+5. Done! You only do this once.
 
 **Option B - Manual (If Option A doesn't work):**
 1. Right-click the `ProtonPulse` folder
-2. Select **Open PowerShell window here as administrator**
+2. Select Open PowerShell window here as administrator
 3. Copy and paste this command:
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\setup_env.ps1
@@ -64,91 +64,88 @@ In the `ProtonPulse` folder, double-click:
 create_shortcut.ps1
 ```
 
-This creates a **"ProtonPulse"** icon on your desktop. ✅
+This creates a "ProtonPulse" icon on your desktop.
 
 ### Every Other Time: Just Click!
 
-1. **Double-click the "ProtonPulse" desktop shortcut**
+1. Double-click the "ProtonPulse" desktop shortcut
 2. A terminal opens and shows status
 3. Browser automatically opens to the app
-4. **Start analyzing!**
+4. Start analyzing!
 
 ---
 
 ## How to Use the App
 
-### 📊 Main Workflow
+### Main Workflow
 
-1. **Welcome Tab** (`🏠`)
+1. Welcome Tab
    - Learn what the app does
    - Understand the algorithms
-   
-2. **Data Input Tab** (`📝`)
+2. Data Input Tab
    - Upload a CSV file, OR
    - Edit example data manually
    - Download template to edit in Excel
-   
-3. **Compute Tab** (`📊`)
+3. Compute Tab
    - Click "Compute Distribution" button
    - See instant results with graphs
    - Download results as CSV
-   
-4. **Validate Tab** (`✅`)
+4. Validate Tab
    - Compare different calculation methods
    - Verify accuracy
 
-### 🎯 Quick Example
+### Quick Example
 
 ```
-1. Click "📝 Data Input" tab
-2. Click "📋 Download Template"
+1. Click Data Input tab
+2. Click Download Template
 3. Open downloaded file in Excel
 4. Add your PTM sites and probabilities
 5. Upload the CSV back into the app
-6. Click "📊 Compute Distribution"
+6. Click Compute Distribution
 7. See results!
 ```
 
 ---
 
-## 📁 Folder Structure
+## Folder Structure
 
 ```
 ProtonPulse/
-├── 📖 INSTALL/
-│   ├── 📄 INSTALLATION_GUIDE.md (this file)
-│   ├── 🔧 setup_env.ps1 (run once)
-│   └── 🖱️ create_shortcut.ps1 (run once)
+├── INSTALL/
+│   ├── INSTALLATION_GUIDE.md (this file)
+│   ├── setup_env.ps1 (run once)
+│   └── create_shortcut.ps1 (run once)
 │
-├── 🚀 QUICKSTART.md (read this)
-├── 📘 README.md (technical details)
+├── QUICKSTART.md (read this)
+├── README.md (technical details)
 │
-├── 🔴 run_protonpulse.bat (launcher - don't edit)
-├── 🔴 run_protonpulse.ps1 (launcher - don't edit)
+├── run_protonpulse.bat (launcher - don't edit)
+├── run_protonpulse.ps1 (launcher - don't edit)
 │
-├── 📊 ptm_charge_input_v2.py (main app - don't edit)
-├── 🧮 advanced_algorithms.py (backend - don't edit)
+├── ptm_charge_input_v2.py (main app - don't edit)
+├── advanced_algorithms.py (backend - don't edit)
 │
-├── 📂 Data/
+├── Data/
 │   ├── sample_ptm_n100.csv (example data)
 │   └── test_csvs/ (test files)
 │
-├── 📂 scripts/
+├── scripts/
 │   └── (helper scripts)
 │
-└── 📂 .venv/
+└── .venv/
     └── (installed Python packages - don't touch)
 ```
 
 ---
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Problem: "PowerShell cannot be opened"
 
 **Solution:**
 1. Right-click Windows PowerShell on Start menu
-2. Select **Run as administrator**
+2. Select Run as administrator
 3. Navigate to ProtonPulse folder:
    ```powershell
    cd C:\Path\To\ProtonPulse
@@ -186,7 +183,6 @@ ProtonPulse/
   - `Site_ID` - name of your PTM site
   - `Copies` - how many times this site appears
   - `P(-2)`, `P(-1)`, `P(0)`, `P(+1)`, `P(+2)` - probabilities
-  
 - Download the template from the app to see the correct format
 - Save as `.csv` (not `.xlsx` or `.xls`)
 
@@ -203,29 +199,29 @@ ProtonPulse/
 
 ---
 
-## 💾 Where Does My Data Go?
+## Where Does My Data Go?
 
-- **Uploaded CSVs**: Only stored in your browser (cleared when you close)
-- **Downloaded results**: Go to your Downloads folder
-- **Local computer**: Your computer stores nothing permanently
-- **Cloud**: Your files are NOT uploaded anywhere
+- Uploaded CSVs: Only stored in your browser (cleared when you close)
+- Downloaded results: Go to your Downloads folder
+- Local computer: Your computer stores nothing permanently
+- Cloud: Your files are NOT uploaded anywhere
 
-**Your data is always private and under your control.**
+Your data is always private and under your control.
 
 ---
 
-## 🔄 Updating ProtonPulse
+## Updating ProtonPulse
 
 If a new version is released:
 
 1. Download the new `ProtonPulse_Setup.zip`
-2. Extract to a **different folder** (e.g., `ProtonPulse_v2.4`)
+2. Extract to a different folder (e.g., `ProtonPulse_v2.4`)
 3. Run `setup_env.ps1` in the new folder
 4. Update your desktop shortcut to point to the new folder
 
 ---
 
-## ⚡ Advanced Usage (For Power Users)
+## Advanced Usage (For Power Users)
 
 ### Run from Terminal
 
@@ -257,23 +253,23 @@ If you want to customize the app:
 
 ---
 
-## 🤝 Support & Feedback
+## Support & Feedback
 
-- **Issues?** Check QUICKSTART.md in the main folder
-- **Questions?** See README.md for technical details
-- **Bug reports?** Contact the development team
-- **Feature requests?** Submit via GitHub issues
+ - Issues? Check [QUICKSTART.md](../QUICKSTART.md) in the main folder
+ - Questions? See [README.md](../README.md) for technical details
+ - Bug reports? Contact the development team
+ - Feature requests? Submit via GitHub issues
+
+See [LICENSE](../LICENSE) file for details.
+
+## License
+
+Questions? Refer to [README.md](../README.md) or contact support.
+See [LICENSE](../LICENSE) file for details.
 
 ---
 
-## 📜 License
-
-ProtonPulse is released under the **MIT License**.
-See `LICENSE` file for details.
-
----
-
-## ✍️ Citation
+## Citation
 
 If you use ProtonPulse in research, please cite:
 
@@ -286,7 +282,7 @@ Authors: Valerie Le & Alex Goferman
 
 ---
 
-## 🔧 For IT Administrators
+## For IT Administrators
 
 ### Network Installation
 
@@ -307,4 +303,4 @@ powershell -ExecutionPolicy Bypass -File setup_env.ps1 -Silent
 
 **Last Updated:** December 3, 2025
 
-**Questions?** Refer to README.md or contact support.
+Questions? Refer to [README.md](../README.md) or contact support.

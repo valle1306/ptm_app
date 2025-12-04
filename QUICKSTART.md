@@ -2,7 +2,7 @@
 
 **For users who want to understand the app in depth**
 
-> **First time?** Read `README.md` first for setup and overview.
+> **First time?** Read [README.md](README.md) first for setup and overview.
 
 ---
 
@@ -31,8 +31,8 @@ Let's say you're analyzing a protein with 3 phosphorylation sites and want to un
 
 **Option B: Create from template**
 1. Open ProtonPulse (double-click shortcut)
-2. Go to **📝 Data Input** tab
-3. Click **📋 Download Template**
+2. Go to **Data Input** tab
+3. Click Download Template
 4. Open in Excel
 5. Fill in your data:
    ```
@@ -46,15 +46,15 @@ Let's say you're analyzing a protein with 3 phosphorylation sites and want to un
 
 **Option C: Edit example data directly in the app**
 1. The app comes with example data pre-loaded
-2. Click the data table in **📝 Data Input** to edit directly
+2. Click the data table in Data Input to edit directly
 3. Click cells to change probability values
 
 #### Phase 2: Generate Results
 
-1. Go to **📊 Compute & Visualize** tab
+1. Go to **Compute & Visualize** tab
 2. Select your preferred charge range (default: -5 to +5)
-3. Click **🚀 Compute Distribution**
-4. **Instant results:**
+3. Click Compute Distribution
+4. Instant results:
    - Bar chart of charge distribution
    - Cumulative line plot
    - Summary statistics
@@ -62,12 +62,12 @@ Let's say you're analyzing a protein with 3 phosphorylation sites and want to un
 #### Phase 3: Download & Analyze
 
 1. Scroll down to see detailed results
-2. Click **📥 Download CSV** to save results
+2. Click Download CSV to save results
 3. Use downloaded file in Excel, papers, presentations
 
 #### Phase 4: Validate (Optional)
 
-1. Go to **✅ Validate** tab
+1. Go to **Validate** tab
 2. Choose a validation method
 3. Compare your results against benchmarks
 4. Verify accuracy
@@ -136,7 +136,7 @@ The app supports different charge ranges. Download the correct template for your
 
 ## In-App Features
 
-### Tab 1: 🏠 Welcome
+### Tab 1: Welcome
 
 **What it contains:**
 - Overview of what ProtonPulse does
@@ -146,7 +146,7 @@ The app supports different charge ranges. Download the correct template for your
 
 **When to use:** First time opening the app
 
-### Tab 2: 📝 Data Input
+### Tab 2: Data Input
 
 **What it contains:**
 - CSV file uploader
@@ -155,8 +155,8 @@ The app supports different charge ranges. Download the correct template for your
 - Charge range selector
 
 **Key actions:**
-1. **Upload CSV** → Click "📤 Upload CSV" and choose your file
-2. **Download Template** → Click "📋 Download Template" for blank CSV
+1. **Upload CSV** → Click "Upload CSV" and choose your file
+2. **Download Template** → Click Download Template for blank CSV
 3. **Edit Directly** → Click data cells to change values
 4. **Change Range** → Select different -N to +N range if needed
 
@@ -165,7 +165,7 @@ The app supports different charge ranges. Download the correct template for your
 - Charge range locks once you upload CSV (prevents accidental reset)
 - "Reset to Example" button restores demo data
 
-### Tab 3: 📊 Compute & Visualize
+### Tab 3: Compute & Visualize
 
 **What it contains:**
 - Charge range selector
@@ -184,13 +184,13 @@ The app supports different charge ranges. Download the correct template for your
    - Tail probabilities
 
 **Colors in charts:**
-- 🔴 Red: Very negative (< -2)
-- 🟠 Orange: Negative (-2 to -1)
-- 🟢 Green: Neutral (0)
-- 🔵 Blue: Positive (+1 to +2)
-- 🟣 Purple: Very positive (> +2)
+- Red: Very negative (< -2)
+- Orange: Negative (-2 to -1)
+- Green: Neutral (0)
+- Blue: Positive (+1 to +2)
+- Purple: Very positive (> +2)
 
-### Tab 4: ✅ Validate
+### Tab 4: Validate
 
 **What it contains:**
 - Validation method selector
@@ -377,7 +377,7 @@ python ptm_charge_input_v2.py --input data.csv --output results.csv
 2. Are your probabilities correct?
 3. Did you use the right charge range?
 
-**Validate:** Use the "✅ Validate" tab
+**Validate:** Use the "Validate" tab
 
 ### "CSV won't upload"
 
@@ -401,13 +401,12 @@ python ptm_charge_input_v2.py --input data.csv --output results.csv
 
 ## Questions?
 
-- **Setup issues:** See `INSTALL/INSTALLATION_GUIDE.md`
-- **Algorithm details:** See `README.md` or in-app Welcome tab
-- **Feature requests:** Submit on GitHub
-- **Bug reports:** Contact development team
+ - **Setup issues:** See [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md)
+ - **Algorithm details:** See [README.md](README.md) or in-app Welcome tab
+ - **Feature requests:** Submit on GitHub
+ - **Bug reports:** Contact development team
 
 ---
 
 **Version:** 2.3 | December 2025
-
-**For more info:** See README.md or launch the app and check the Welcome tab
+**For more info:** See [README.md](README.md) or launch the app and check the Welcome tab
