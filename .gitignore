@@ -70,3 +70,6 @@ htmlcov/
 *.jpeg
 *.png
 *.gif
+
+# Personal presentation materials (reference only)
+presentations/
