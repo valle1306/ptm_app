@@ -249,13 +249,23 @@ Charge -1 has height 0.12 → 12% chance protein has charge -1
 
 The app automatically picks the best algorithm:
 
-**Small data (≤50 copies):** Uses exact convolution
+| Copies | Method | Accuracy |
+|--------|--------|----------|
+| ≤50 | Yergeev Convolution | Exact |
+| 51-200 | FFT-Accelerated | Exact |
+| >200 | Gaussian (CLT) | Approximate |
+
+**Small data (≤50 copies):** Uses exact Yergeev convolution
 - Results are mathematically guaranteed correct
 - Fast computation
 
+**Medium data (51-200 copies):** Uses FFT-accelerated convolution
+- Still exact results
+- Faster for larger datasets
+
 **Large data (>200 copies):** Uses Gaussian approximation
 - Trades some precision for speed
-- Still very accurate for most purposes
+- Still very accurate for most purposes (Central Limit Theorem)
 
 **Check which was used:** Look at the "Algorithm Used" line in results
 

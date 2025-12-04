@@ -425,10 +425,15 @@ with tab_welcome:
         st.markdown("### 🔬 Algorithm Overview")
         with st.expander("How does it work?", expanded=True):
             st.markdown("""
-            **Yergeev Convolution** (gold standard):
-            - Uses discrete convolution to combine site distributions
-            - **Exact results** with O(n²) complexity
-            - Fast even for thousands of sites!
+            **Adaptive Algorithm Selection:**
+            
+            ProtonPulse automatically chooses the best method based on your data size:
+            
+            | Copies | Method | Accuracy |
+            |--------|--------|----------|
+            | ≤50 | Yergeev Convolution | Exact |
+            | 51-200 | FFT-Accelerated | Exact |
+            | >200 | Gaussian (CLT) | Approximate |
             
             **Why not enumerate all combinations?**
             - For 5 charge states & n copies: 5ⁿ combinations
@@ -439,10 +444,50 @@ with tab_welcome:
         
         with st.expander("📚 References"):
             st.markdown("""
-            - Yergeev, L.M. (1983). *Efficient computation of discrete convolutions*
+            - Yergey, J.A. (1983). *A general approach to calculating isotopic distributions for mass spectrometry*
             - Central Limit Theorem for Gaussian approximation
             - FFT-based convolution for large datasets
             """)
+    
+    # App Demo Section
+    st.markdown("---")
+    with st.expander("🎬 App Demo (Quick Walkthrough)", expanded=False):
+        demo_col1, demo_col2 = st.columns(2)
+        
+        with demo_col1:
+            st.markdown("""
+            #### Step 1: Prepare Your Data
+            1. Go to **📝 Data Input** tab
+            2. Choose your charge range (e.g., -2 to +2)
+            3. Either:
+               - Download a template CSV
+               - Edit the example data directly
+               - Upload your own CSV
+            
+            #### Step 2: Enter PTM Sites
+            - Each row = one PTM site
+            - Set **Copies** (how many times it appears)
+            - Enter probabilities for each charge state
+            - Ensure each row sums to 1.0
+            """)
+        
+        with demo_col2:
+            st.markdown("""
+            #### Step 3: Compute Results
+            1. Go to **📊 Compute & Visualize** tab
+            2. Click **🚀 Compute Distribution**
+            3. View:
+               - Distribution chart
+               - Summary statistics
+               - Most likely charge state
+            
+            #### Step 4: Export & Validate
+            - Download results as CSV
+            - Use **✅ Validate** tab to verify accuracy
+            - Compare against benchmark methods
+            """)
+        
+        st.info("💡 **Tip:** Start with the example data to see how the tool works before uploading your own data.")
 
 # ============ TAB: DATA INPUT ============
 with tab_input:
@@ -509,19 +554,39 @@ with tab_input:
                     st.error(f"Error loading CSV: {e}")
         
         with file_col2:
-            # Download template
-            template_cols = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
-            neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
-            template_probs = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+            # Adaptive template download with charge range selector
+            st.markdown("**📋 Download Template**")
+            
+            # Template charge range options
+            template_options = {
+                "-1 to +1 (3 states)": (-1, 1),
+                "-2 to +2 (5 states)": (-2, 2),
+                "-3 to +3 (7 states)": (-3, 3),
+                "-5 to +5 (11 states)": (-5, 5),
+                "-7 to +7 (15 states)": (-7, 7),
+            }
+            
+            selected_template = st.selectbox(
+                "Charge range for template:",
+                list(template_options.keys()),
+                index=1,  # Default to -2 to +2
+                key="template_range_selector",
+                help="Choose the charge range for your CSV template"
+            )
+            
+            tpl_min, tpl_max = template_options[selected_template]
+            template_cols = generate_charge_columns(tpl_min, tpl_max)
+            neutral = neutral_index_for_range(tpl_min, tpl_max)
+            template_probs = [0.0] * (tpl_max - tpl_min + 1)
             template_probs[neutral] = 1.0
             template_df = pd.DataFrame([["Site_1", 1] + template_probs], columns=template_cols)
             template_csv = template_df.to_csv(index=False)
             st.download_button(
-                label="📋 Download Template",
+                label="⬇️ Download",
                 data=template_csv,
-                file_name="ptm_template.csv",
+                file_name=f"ptm_template_{tpl_min}_to_{tpl_max}.csv",
                 mime="text/csv",
-                help="Download empty template CSV"
+                help=f"Download template with {selected_template}"
             )
             st.caption("Edit in Excel, then upload")
     
