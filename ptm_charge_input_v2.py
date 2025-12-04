@@ -339,6 +339,19 @@ def window_distribution(arr, off, low=-5, high=+5):
     tail_high = arr[charges > high].sum()
     return window, float(tail_low), float(tail_high)
 
+def get_charge_color(charge):
+    """Color scheme: gradient from red (negative) → green (neutral) → blue (positive)"""
+    if charge < -2:
+        return '#d62728'  # Dark red for very negative
+    elif charge < 0:
+        return '#ff7f0e'  # Orange for slightly negative
+    elif charge == 0:
+        return '#2ca02c'  # Green for neutral
+    elif charge <= 2:
+        return '#1f77b4'  # Blue for slightly positive
+    else:
+        return '#9467bd'  # Purple for very positive
+
 # ============ SESSION STATE ============
 if "charge_system" not in st.session_state:
     st.session_state.charge_system = "5-state"
@@ -751,20 +764,29 @@ with tab_compute:
                     elapsed = time.time() - start
                     method_used = "Yergeev"
                 
-                # Use dynamic window based on total copies and charge range
-                # Window should be large enough to capture most of the distribution
-                total_copies_for_window = int(df_compute['Copies'].sum())
-                window_size = max(10, min(total_copies_for_window * 2, 50))  # Dynamic window
-                window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -window_size, +window_size)
+                # Per challenge requirements: main display shows -5 to +5
+                # But also compute full distribution for those who want to see more
+                window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -5, +5)
+                
+                # Also compute full distribution for expanded view
+                full_charges = np.arange(pmf_off, pmf_off + len(pmf_arr))
+                full_df = pd.DataFrame({
+                    "Charge": full_charges,
+                    "Probability": pmf_arr
+                })
+                # Filter out zero probabilities for cleaner display
+                full_df = full_df[full_df['Probability'] > 1e-10].reset_index(drop=True)
                 
                 st.session_state.last_results = {
                     "window_df": window_df,
+                    "full_df": full_df,
                     "tail_low": tail_low,
                     "tail_high": tail_high,
                     "elapsed": elapsed,
                     "method": method_used,
                     "total_copies": total_copies,
-                    "window_size": window_size
+                    "pmf_offset": pmf_off,
+                    "pmf_length": len(pmf_arr)
                 }
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -797,13 +819,13 @@ with tab_compute:
         chart_col, interp_col = st.columns([3, 1])
         
         with chart_col:
-            st.markdown("### 📈 Distribution")
+            st.markdown("### 📈 Distribution (Charges -5 to +5)")
+            st.caption("Per challenge requirements: showing main charge range. See below for full distribution.")
             
-            colors = ['#d62728' if c < -2 else '#ff7f0e' if c < 0 else '#2ca02c' if c == 0 else '#1f77b4' if c <= 2 else '#9467bd' 
-                      for c in window_df['Charge']]
+            colors = [get_charge_color(c) for c in window_df['Charge']]
             
             fig = make_subplots(rows=2, cols=1, row_heights=[0.6, 0.4], vertical_spacing=0.12,
-                               subplot_titles=('Probability', 'Cumulative'))
+                               subplot_titles=('Probability Distribution', 'Cumulative Distribution'))
             
             fig.add_trace(go.Bar(x=window_df['Charge'], y=window_df['Probability'], marker_color=colors,
                                 hovertemplate='Charge: %{x:+d}<br>P: %{y:.4f}<extra></extra>'), row=1, col=1)
@@ -811,21 +833,36 @@ with tab_compute:
             cumulative = np.cumsum(window_df['Probability'].values)
             fig.add_trace(go.Scatter(x=window_df['Charge'].values, y=cumulative, mode='lines+markers',
                                     line=dict(color='#1f77b4', width=2), marker=dict(size=5),
-                                    hovertemplate='≤%{x:+d}: %{y:.3f}<extra></extra>'), row=2, col=1)
+                                    hovertemplate='P(≤%{x:+d}): %{y:.3f}<extra></extra>'), row=2, col=1)
             
             fig.add_hline(y=0.5, line_dash="dash", line_color="gray", row=2, col=1)
             fig.update_layout(height=450, showlegend=False, template='plotly_white', margin=dict(t=30, b=30))
+            fig.update_xaxes(title_text="Charge State", row=2, col=1)
+            fig.update_yaxes(title_text="Probability", row=1, col=1)
+            fig.update_yaxes(title_text="Cumulative P", row=2, col=1)
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Color legend
+            st.markdown("""
+            <div style="font-size: 0.8rem; color: #666;">
+            <b>Color Key:</b> 
+            <span style="color: #d62728;">■</span> Very Negative (< -2) |
+            <span style="color: #ff7f0e;">■</span> Negative (-2 to -1) |
+            <span style="color: #2ca02c;">■</span> Neutral (0) |
+            <span style="color: #1f77b4;">■</span> Positive (+1 to +2) |
+            <span style="color: #9467bd;">■</span> Very Positive (> +2)
+            </div>
+            """, unsafe_allow_html=True)
         
         with interp_col:
-            st.markdown("### 🔍 Interpretation")
+            st.markdown("### 🔍 Summary")
             st.markdown(f"""
             **Most likely charge:**  
             **{most_likely:+d}** ({peak_prob:.1%})
             
             ---
             
-            **Central mass** (-5 to +5):  
+            **Mass in [-5, +5]:**  
             {central_mass:.1%}
             
             **Left tail** (< -5):  
@@ -836,15 +873,69 @@ with tab_compute:
             
             ---
             
-            **Method used:**  
+            **Method:**  
             {res['method']}
             
-            **Compute time:**  
+            **Time:**  
             {res['elapsed']*1000:.1f} ms
             """)
             
-            with st.expander("📋 Data"):
-                st.dataframe(window_df, hide_index=True, height=200)
+            with st.expander("📋 Data (-5 to +5)"):
+                st.dataframe(window_df, hide_index=True, height=180)
+        
+        # Full distribution section (expandable)
+        st.markdown("---")
+        with st.expander("📊 View Full Distribution (Beyond -5 to +5)", expanded=False):
+            full_df = res.get("full_df")
+            if full_df is not None and len(full_df) > 0:
+                st.markdown(f"**Full range:** {int(full_df['Charge'].min()):+d} to {int(full_df['Charge'].max()):+d}")
+                
+                # Full distribution chart
+                full_colors = [get_charge_color(c) for c in full_df['Charge']]
+                
+                fig_full = go.Figure()
+                fig_full.add_trace(go.Bar(
+                    x=full_df['Charge'], 
+                    y=full_df['Probability'], 
+                    marker_color=full_colors,
+                    hovertemplate='Charge: %{x:+d}<br>P: %{y:.6f}<extra></extra>'
+                ))
+                fig_full.update_layout(
+                    height=300, 
+                    template='plotly_white',
+                    xaxis_title="Charge State",
+                    yaxis_title="Probability",
+                    margin=dict(t=20, b=40)
+                )
+                st.plotly_chart(fig_full, use_container_width=True)
+                
+                # Data table
+                col_data1, col_data2 = st.columns(2)
+                with col_data1:
+                    st.markdown("**Probability Table:**")
+                    # Format for display
+                    display_df = full_df.copy()
+                    display_df['Probability'] = display_df['Probability'].apply(lambda x: f"{x:.6f}")
+                    st.dataframe(display_df, hide_index=True, height=250)
+                with col_data2:
+                    # Download option
+                    csv_data = full_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Download Full Distribution (CSV)",
+                        data=csv_data,
+                        file_name="charge_distribution_full.csv",
+                        mime="text/csv"
+                    )
+                    st.markdown(f"""
+                    **Statistics:**
+                    - Total charge states: {len(full_df)}
+                    - Min charge: {int(full_df['Charge'].min()):+d}
+                    - Max charge: {int(full_df['Charge'].max()):+d}
+                    - Total probability: {full_df['Probability'].sum():.6f}
+                    """)
+            else:
+                st.info("Full distribution data not available.")
+                
     else:
         st.info("👆 Click **Compute Distribution** to calculate results")
 
