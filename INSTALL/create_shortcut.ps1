@@ -17,7 +17,18 @@ $shortcut = $WshShell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $scriptPath
 $shortcut.WorkingDirectory = Split-Path -Parent $scriptPath
 $shortcut.Description = "ProtonPulse - PTM Charge Distribution Analyzer"
-$shortcut.IconLocation = "C:\Windows\System32\imageres.dll,170"  # Blue chemistry/test tube icon
+
+# Use custom ProtonPulse logo (in assets subfolder)
+$installDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$logoPath = Join-Path $installDir "assets\protonpulse_logo.ico"
+if (Test-Path $logoPath) {
+    $shortcut.IconLocation = $logoPath
+} else {
+    # Fallback to system icon if custom logo not found
+    Write-Host "⚠️  Custom logo not found at: $logoPath" -ForegroundColor Yellow
+    Write-Host "    Falling back to system icon" -ForegroundColor Yellow
+    $shortcut.IconLocation = "C:\Windows\System32\imageres.dll,170"
+}
 
 # Save the shortcut
 $shortcut.Save()

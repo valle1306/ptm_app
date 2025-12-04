@@ -28,6 +28,11 @@ dist/
 
 # Logs and databases
 *.log
+
+# Logo generation (keep only ICO, not PNG)
+# Logo PNG is now tracked (user-designed logo)
+INSTALL/protonpulse_logo_256.png
+create_logo.py`nconvert_logo.py
 *.sqlite3
 
 # Streamlit caches and temp files
@@ -70,6 +75,10 @@ htmlcov/
 *.jpeg
 *.png
 *.gif
+
+# Keep ProtonPulse logo assets
+!INSTALL/assets/protonpulse_logo.png
+!INSTALL/assets/protonpulse_logo.ico
 
 # Personal presentation materials (reference only)
 presentations/

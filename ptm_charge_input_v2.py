@@ -21,7 +21,7 @@ except ImportError:
 st.set_page_config(
     page_title="ProtonPulse",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
     page_icon="🔬"
 )
 
@@ -163,6 +163,34 @@ st.markdown("""
         padding: 1rem 0.5rem !important;
     }
     
+    /* Sidebar logo branding - centered */
+    [data-testid="stSidebar"] [data-testid="stImage"] {
+        display: flex;
+        justify-content: center;
+    }
+    [data-testid="stSidebar"] [data-testid="stImage"] img {
+        display: block;
+        margin: 0 auto;
+    }
+    .sidebar-title {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #A855F7 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-align: center;
+        margin: 10px 0 8px 0 !important;
+        letter-spacing: 0.5px;
+    }
+    .sidebar-links a {
+        color: #6366F1 !important;
+        text-decoration: none;
+    }
+    .sidebar-links a:hover {
+        text-decoration: underline;
+    }
+    
     /* Plotly chart - make more compact */
     .js-plotly-plot {
         margin-top: 0 !important;
@@ -172,14 +200,24 @@ st.markdown("""
 
 # ============ SIDEBAR ============
 with st.sidebar:
-    st.markdown("## 🔬 ProtonPulse")
+    # Display ProtonPulse logo with styled title below (centered, larger)
+    try:
+        logo_path = "INSTALL/assets/protonpulse_logo.png"
+        st.image(logo_path, width=180, use_container_width=False)
+        st.markdown('<p class="sidebar-title">ProtonPulse</p>', unsafe_allow_html=True)
+    except:
+        st.markdown('<p class="sidebar-title">🔬 ProtonPulse</p>', unsafe_allow_html=True)
+    
     st.caption("PTM Charge Distribution Analyzer")
     st.markdown("---")
     st.markdown("""
     **Developed by:**  
     Valerie Le & Alex Goferman  
     MSDS Program, Rutgers University
-    
+    """)
+    st.markdown('<p class="sidebar-links">📂 <a href="https://github.com/valle1306/ptm_app" target="_blank">GitHub Repository</a></p>', unsafe_allow_html=True)
+    st.markdown('<p class="sidebar-links">🚀 <a href="https://protonpulse.streamlit.app/" target="_blank">Live App</a></p>', unsafe_allow_html=True)
+    st.markdown("""  
     **Version:** 2.3 | December 2025
     """)
 
@@ -423,7 +461,7 @@ with tab_welcome:
     
     with col2:
         st.markdown("### 🔬 Algorithm Overview")
-        with st.expander("How does it work?", expanded=True):
+        with st.expander("How does it work?", expanded=False):
             st.markdown("""
             **Adaptive Algorithm Selection:**
             
@@ -442,7 +480,7 @@ with tab_welcome:
             - Convolution avoids this exponential explosion
             """)
         
-        with st.expander("📚 References"):
+        with st.expander("📚 References", expanded=False):
             st.markdown("""
             - Yergey, J.A. (1983). *A general approach to calculating isotopic distributions for mass spectrometry*
             - Central Limit Theorem for Gaussian approximation
