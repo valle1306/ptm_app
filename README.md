@@ -20,7 +20,7 @@ Calculate charge variant distributions for post-translationally modified protein
 3. **Then every time:** Double-click the desktop shortcut created by `INSTALL/create_shortcut.ps1`
 4. **App opens automatically** in your browser — start analyzing!
 
-**Need details?** See `INSTALL/INSTALLATION_GUIDE.md`
+**Need details?** See [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md)
 
 ---
 
@@ -128,7 +128,7 @@ You cannot use just individual files. The app depends on the project structure.
 - Double-click `run_protonpulse.bat` in the main folder
 - Browser opens automatically
 
-For more details, see `INSTALL/INSTALLATION_GUIDE.md`
+For more details, see [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md)
 
 ---
 
@@ -220,7 +220,7 @@ Site_2,1,0.0,0.1,0.8,0.1,0.0
 
 ### More help
 
-See `INSTALL/INSTALLATION_GUIDE.md` for extended troubleshooting
+See [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md) for extended troubleshooting
 
 ---
 
@@ -321,7 +321,7 @@ A: No! ProtonPulse is designed for lab scientists. Just click buttons and upload
 A: Yes, but instructions are optimized for Windows. Follow the "Advanced" section above.
 
 **Q: Can I modify the code?**  
-A: Yes! MIT License allows modification. See QUICKSTART.md for insights into the codebase.
+A: Yes! MIT License allows modification. See [QUICKSTART.md](QUICKSTART.md) for insights into the codebase.
 
 **Q: How do I report bugs?**  
 A: Submit issues on GitHub or contact the development team.
@@ -348,7 +348,7 @@ MSDS Program, Rutgers University
 ## Next Steps
 
 1. **Extract the repo** (download ZIP and extract)
-2. **Follow installation** (see above or `INSTALL/INSTALLATION_GUIDE.md`)
+2. **Follow installation** (see above or [INSTALL/INSTALLATION_GUIDE.md](INSTALL/INSTALLATION_GUIDE.md))
 3. **Launch the app** (click desktop shortcut or `run_protonpulse.bat`)
 4. **Read Welcome tab** (in-app tutorial with examples)
 5. **Start analyzing!** (upload CSV or use template)
