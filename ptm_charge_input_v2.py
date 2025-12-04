@@ -203,7 +203,7 @@ with st.sidebar:
     # Display ProtonPulse logo with styled title below (centered, larger)
     try:
         logo_path = "INSTALL/assets/protonpulse_logo.png"
-        st.image(logo_path, width=180, use_container_width=False)
+        st.image(logo_path, width=180)
         st.markdown('<p class="sidebar-title">ProtonPulse</p>', unsafe_allow_html=True)
     except:
         st.markdown('<p class="sidebar-title">🔬 ProtonPulse</p>', unsafe_allow_html=True)
@@ -536,37 +536,31 @@ with tab_input:
     if "csv_loaded" not in st.session_state:
         st.session_state.csv_loaded = False
     
-    # CSV Upload Section - collapsible after successful load
-    if st.session_state.csv_loaded:
-        # Show compact success message with option to upload new file
-        up_col1, up_col2, up_col3 = st.columns([3, 2, 2])
-        with up_col1:
-            st.success(f"✅ Data loaded: {len(st.session_state.df)} sites, {int(st.session_state.df['Copies'].sum())} total copies")
-        with up_col2:
-            csv_data = st.session_state.df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download CSV",
-                data=csv_data,
-                file_name="ptm_data.csv",
-                mime="text/csv",
-                help="Download current data for editing in Excel"
-            )
-        with up_col3:
-            if st.button("📤 Upload New CSV", key="btn_new_upload"):
-                st.session_state.csv_loaded = False
-                st.rerun()
-    else:
-        # Show file uploader
-        st.markdown("#### 📁 Load Data")
-        file_col1, file_col2 = st.columns([3, 2])
+    # === MAIN LAYOUT: Two modes - Upload mode vs Data Loaded mode ===
+    
+    if not st.session_state.csv_loaded:
+        # ============ UPLOAD MODE - Clean, focused upload experience ============
+        st.markdown("---")
         
-        with file_col1:
+        # Centered upload section with visual hierarchy
+        upload_col1, upload_col2, upload_col3 = st.columns([1, 2, 1])
+        
+        with upload_col2:
+            st.markdown("""
+            <div style="text-align: center; padding: 20px 0;">
+                <h4 style="color: #4F46E5; margin-bottom: 10px;">📁 Upload Your Data</h4>
+                <p style="color: #666; font-size: 0.9rem;">Upload a CSV file with PTM site data, or start with a template</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
             uploaded_file = st.file_uploader(
-                "📤 Upload CSV", 
+                "Choose CSV file", 
                 type=['csv'], 
                 key="csv_uploader",
-                help="CSV with columns: Site_ID, Copies, P(-2), P(-1), P(0), P(+1), P(+2)"
+                help="CSV with columns: Site_ID, Copies, P(-2), P(-1), P(0), P(+1), P(+2)",
+                label_visibility="collapsed"
             )
+            
             if uploaded_file is not None:
                 try:
                     uploaded_df = pd.read_csv(uploaded_file)
@@ -591,25 +585,27 @@ with tab_input:
                 except Exception as e:
                     st.error(f"Error loading CSV: {e}")
         
-        with file_col2:
-            # Adaptive template download with charge range selector
-            st.markdown("**📋 Download Template**")
-            
-            # Template charge range options
+        st.markdown("---")
+        
+        # Template download section - clean card-like layout
+        st.markdown("##### 📋 Or Start with a Template")
+        
+        tpl_col1, tpl_col2, tpl_col3 = st.columns([2, 2, 2])
+        
+        with tpl_col1:
             template_options = {
                 "-1 to +1 (3 states)": (-1, 1),
                 "-2 to +2 (5 states)": (-2, 2),
                 "-3 to +3 (7 states)": (-3, 3),
                 "-5 to +5 (11 states)": (-5, 5),
-                "-7 to +7 (15 states)": (-7, 7),
             }
             
             selected_template = st.selectbox(
-                "Charge range for template:",
+                "Charge range:",
                 list(template_options.keys()),
-                index=1,  # Default to -2 to +2
+                index=1,
                 key="template_range_selector",
-                help="Choose the charge range for your CSV template"
+                help="Choose the charge range for your template"
             )
             
             tpl_min, tpl_max = template_options[selected_template]
@@ -619,198 +615,199 @@ with tab_input:
             template_probs[neutral] = 1.0
             template_df = pd.DataFrame([["Site_1", 1] + template_probs], columns=template_cols)
             template_csv = template_df.to_csv(index=False)
+            
             st.download_button(
-                label="⬇️ Download",
+                label="⬇️ Download Template CSV",
                 data=template_csv,
                 file_name=f"ptm_template_{tpl_min}_to_{tpl_max}.csv",
-                mime="text/csv",
-                help=f"Download template with {selected_template}"
+                mime="text/csv"
             )
-            st.caption("Edit in Excel, then upload")
-    
-    st.markdown("---")
-    st.markdown("#### ⚙️ Settings")
-    
-    # Controls
-    c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
-    
-    with c1:
-        # Build charge options dynamically - include current range if custom
-        charge_options = {
-            "3-state (-1 to +1)": (-1, 1),
-            "5-state (-2 to +2)": (-2, 2),
-            "7-state (-3 to +3)": (-3, 3),
-            "9-state (-4 to +4)": (-4, 4),
-            "11-state (-5 to +5)": (-5, 5),
-            "13-state (-6 to +6)": (-6, 6),
-            "15-state (-7 to +7)": (-7, 7),
-            "21-state (-10 to +10)": (-10, 10),
-        }
         
-        # Detect current range from loaded data
-        current_min = st.session_state.min_charge
-        current_max = st.session_state.max_charge
-        n_states = current_max - current_min + 1
-        current_key = f"{n_states}-state ({current_min} to +{current_max})"
-        
-        # Add current range to options if not already present
-        if current_key not in charge_options:
-            charge_options[current_key] = (current_min, current_max)
-        
-        # Sort options by number of states
-        sorted_options = dict(sorted(charge_options.items(), key=lambda x: x[1][1] - x[1][0]))
-        option_keys = list(sorted_options.keys())
-        
-        # Find the index of current selection
-        try:
-            current_index = option_keys.index(current_key)
-        except ValueError:
-            current_index = 1  # Default to 5-state
-        
-        # Only show the selector if NOT in csv_loaded mode (to prevent accidental reset)
-        if st.session_state.csv_loaded:
-            # Show read-only display of current range
-            st.info(f"📊 Loaded: {n_states}-state ({current_min} to +{current_max})")
-            if st.button("🔄 Change Range", key="btn_change_range", help="Reset data and choose a different charge range"):
-                st.session_state.csv_loaded = False
-                st.rerun()
-        else:
-            selection = st.selectbox("🔢 Charge Range", option_keys,
-                                     index=current_index,
-                                     key="input_charge_range")
-            new_min, new_max = sorted_options[selection]
-            
-            if new_min != st.session_state.min_charge or new_max != st.session_state.max_charge:
-                st.session_state.min_charge = new_min
-                st.session_state.max_charge = new_max
-                new_cols = generate_charge_columns(new_min, new_max)
-                neutral_idx = neutral_index_for_range(new_min, new_max)
-                probs1 = [0.0] * (new_max - new_min + 1)
-                probs2 = [0.0] * (new_max - new_min + 1)
-                probs1[neutral_idx] = 1.0
-                probs2[neutral_idx] = 0.6
-                if new_min <= -1 <= new_max:
-                    probs2[index_for_charge(-1, new_min)] = 0.2
-                if new_min <= 1 <= new_max:
-                    probs2[index_for_charge(1, new_min)] = 0.2
-                st.session_state.df = pd.DataFrame([
-                    ["Site_1", 1] + probs1,
-                    ["Site_2", 1] + probs2,
-                ], columns=new_cols)
+        with tpl_col2:
+            st.markdown("**Quick Start Options:**")
+            if st.button("📄 Load 10-site example", key="btn_quick_10"):
+                template_data = []
+                for i in range(1, 11):
+                    copies = (i % 3) + 1
+                    neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+                    probs = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+                    probs[neutral] = 0.6
+                    if st.session_state.min_charge <= -1:
+                        probs[index_for_charge(-1, st.session_state.min_charge)] = 0.2
+                    if st.session_state.max_charge >= 1:
+                        probs[index_for_charge(1, st.session_state.min_charge)] = 0.2
+                    template_data.append([f"Site_{i}", copies] + probs)
+                st.session_state.df = pd.DataFrame(template_data,
+                    columns=generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge))
+                st.session_state.csv_loaded = True
                 st.session_state.last_results = None
                 st.rerun()
-    
-    with c2:
-        if st.button("📄 Load 100-site template", key="btn_template"):
-            template_data = []
-            for i in range(1, 101):
-                copies = (i % 3) + 1
-                neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
-                probs = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
-                probs[neutral] = 0.6
-                if st.session_state.min_charge <= -1:
-                    probs[index_for_charge(-1, st.session_state.min_charge)] = 0.2
-                if st.session_state.max_charge >= 1:
-                    probs[index_for_charge(1, st.session_state.min_charge)] = 0.2
-                template_data.append([f"Site_{i}", copies] + probs)
-            st.session_state.df = pd.DataFrame(template_data,
-                columns=generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge))
-            st.session_state.last_results = None
-            st.rerun()
-    
-    with c3:
-        if st.button("🔄 Reset to default", key="btn_reset"):
-            neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
-            probs1 = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
-            probs2 = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
-            probs1[neutral] = 1.0
-            probs2[neutral] = 0.6
-            if st.session_state.min_charge <= -1:
-                probs2[index_for_charge(-1, st.session_state.min_charge)] = 0.2
-            if st.session_state.max_charge >= 1:
-                probs2[index_for_charge(1, st.session_state.min_charge)] = 0.2
-            st.session_state.df = pd.DataFrame([
-                ["Site_1", 1] + probs1,
-                ["Site_2", 1] + probs2,
-            ], columns=generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge))
-            st.session_state.last_results = None
-            st.rerun()
-    
-    with c4:
-        st.metric("Sites", len(st.session_state.df))
-    
-    st.markdown("---")
-    
-    with st.expander("💡 How to enter data"):
-        st.markdown("""
-        | Column | Description |
-        |--------|-------------|
-        | Site_ID | Name for your site (e.g., "Ser123") |
-        | Copies | How many copies of this site (usually 1) |
-        | P(-2)...P(+2) | Probability of each charge state (must sum to 1.0) |
         
-        **💡 Tip:** For easier editing, download the data as CSV, edit in Excel, then upload!
-        """)
-    
-    # Data editor - use a cleaner approach to avoid flickering
-    st.markdown("**Edit probabilities below** (each row should sum to 1.0)")
-    
-    prob_cols = [col for col in st.session_state.df.columns if col.startswith("P(")]
-    
-    # Create a working copy for the editor (without computed columns)
-    editor_df = st.session_state.df.copy()
-    
-    # Column configuration
-    col_config = {
-        "Site_ID": st.column_config.TextColumn("Site ID", width="small"),
-        "Copies": st.column_config.NumberColumn("Copies", min_value=1, max_value=10, step=1, width="small"),
-    }
-    for col in prob_cols:
-        col_config[col] = st.column_config.NumberColumn(col, min_value=0.0, max_value=1.0, step=0.01, format="%.3f")
-    
-    # Use on_change callback to properly handle edits
-    edited = st.data_editor(
-        editor_df,
-        column_config=col_config,
-        num_rows="dynamic",
-        hide_index=True,
-        key="main_data_editor",
-        width="stretch"
-    )
-    
-    # Update session state with edited data
-    st.session_state.df = edited.copy()
-    
-    # Show validation status separately (not in the editor)
-    if prob_cols and len(edited) > 0:
-        sums = edited[prob_cols].sum(axis=1)
-        valid_mask = np.isclose(sums, 1.0, atol=1e-6)
-        invalid_count = sum(~valid_mask)
+        with tpl_col3:
+            st.markdown("&nbsp;")  # Spacer
+            if st.button("📄 Load 100-site example", key="btn_quick_100"):
+                template_data = []
+                for i in range(1, 101):
+                    copies = (i % 3) + 1
+                    neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+                    probs = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+                    probs[neutral] = 0.6
+                    if st.session_state.min_charge <= -1:
+                        probs[index_for_charge(-1, st.session_state.min_charge)] = 0.2
+                    if st.session_state.max_charge >= 1:
+                        probs[index_for_charge(1, st.session_state.min_charge)] = 0.2
+                    template_data.append([f"Site_{i}", copies] + probs)
+                st.session_state.df = pd.DataFrame(template_data,
+                    columns=generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge))
+                st.session_state.csv_loaded = True
+                st.session_state.last_results = None
+                st.rerun()
         
-        # Show summary metrics
-        val_col1, val_col2, val_col3 = st.columns(3)
-        with val_col1:
-            st.metric("Total Rows", len(edited))
-        with val_col2:
-            st.metric("Valid Rows", sum(valid_mask))
-        with val_col3:
+        # Help section at the bottom
+        with st.expander("💡 How to format your CSV"):
+            st.markdown("""
+            | Column | Description |
+            |--------|-------------|
+            | Site_ID | Name for your site (e.g., "Ser123") |
+            | Copies | How many copies of this site (usually 1) |
+            | P(-2)...P(+2) | Probability of each charge state (must sum to 1.0) |
+            
+            **💡 Tip:** Download a template, edit in Excel, then upload!
+            """)
+    
+    else:
+        # ============ DATA LOADED MODE - Show data with settings ============
+        
+        # Compact header with data info and actions
+        header_col1, header_col2, header_col3 = st.columns([3, 2, 2])
+        with header_col1:
+            n_states = st.session_state.max_charge - st.session_state.min_charge + 1
+            st.success(f"✅ Data loaded: {len(st.session_state.df)} sites, {int(st.session_state.df['Copies'].sum())} total copies | {n_states}-state ({st.session_state.min_charge} to +{st.session_state.max_charge})")
+        with header_col2:
+            csv_data = st.session_state.df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_data,
+                file_name="ptm_data.csv",
+                mime="text/csv",
+                help="Download current data for editing in Excel"
+            )
+        with header_col3:
+            if st.button("📤 Upload New CSV", key="btn_new_upload"):
+                st.session_state.csv_loaded = False
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Settings section - only visible after data is loaded
+        st.markdown("#### ⚙️ Settings")
+        
+        settings_col1, settings_col2, settings_col3, settings_col4 = st.columns([2, 2, 2, 1])
+        
+        with settings_col1:
+            if st.button("📄 Load 100-site template", key="btn_template"):
+                template_data = []
+                for i in range(1, 101):
+                    copies = (i % 3) + 1
+                    neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+                    probs = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+                    probs[neutral] = 0.6
+                    if st.session_state.min_charge <= -1:
+                        probs[index_for_charge(-1, st.session_state.min_charge)] = 0.2
+                    if st.session_state.max_charge >= 1:
+                        probs[index_for_charge(1, st.session_state.min_charge)] = 0.2
+                    template_data.append([f"Site_{i}", copies] + probs)
+                st.session_state.df = pd.DataFrame(template_data,
+                    columns=generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge))
+                st.session_state.last_results = None
+                st.rerun()
+        
+        with settings_col2:
+            if st.button("🔄 Reset to default", key="btn_reset"):
+                st.session_state.csv_loaded = False
+                st.session_state.last_results = None
+                st.rerun()
+        
+        with settings_col3:
+            if st.button("🔀 Change Range", key="btn_change_range", help="Upload new data with different charge range"):
+                st.session_state.csv_loaded = False
+                st.rerun()
+        
+        with settings_col4:
+            st.metric("Sites", len(st.session_state.df))
+        
+        st.markdown("---")
+        
+        with st.expander("💡 How to enter data"):
+            st.markdown("""
+            | Column | Description |
+            |--------|-------------|
+            | Site_ID | Name for your site (e.g., "Ser123") |
+            | Copies | How many copies of this site (usually 1) |
+            | P(-2)...P(+2) | Probability of each charge state (must sum to 1.0) |
+            
+            **💡 Tip:** For easier editing, download the data as CSV, edit in Excel, then upload!
+            """)
+        
+        # Data editor - use a cleaner approach to avoid flickering
+        st.markdown("**Edit probabilities below** (each row should sum to 1.0)")
+        
+        prob_cols = [col for col in st.session_state.df.columns if col.startswith("P(")]
+        
+        # Create a working copy for the editor (without computed columns)
+        editor_df = st.session_state.df.copy()
+        
+        # Column configuration
+        col_config = {
+            "Site_ID": st.column_config.TextColumn("Site ID", width="small"),
+            "Copies": st.column_config.NumberColumn("Copies", min_value=1, max_value=10, step=1, width="small"),
+        }
+        for col in prob_cols:
+            col_config[col] = st.column_config.NumberColumn(col, min_value=0.0, max_value=1.0, step=0.01, format="%.3f")
+        
+        # Use on_change callback to properly handle edits
+        edited = st.data_editor(
+            editor_df,
+            column_config=col_config,
+            num_rows="dynamic",
+            hide_index=True,
+            key="main_data_editor",
+            width="stretch"
+        )
+        
+        # Update session state with edited data
+        st.session_state.df = edited.copy()
+        
+        # Show validation status separately (not in the editor)
+        if prob_cols and len(edited) > 0:
+            sums = edited[prob_cols].sum(axis=1)
+            valid_mask = np.isclose(sums, 1.0, atol=1e-6)
+            invalid_count = sum(~valid_mask)
+            
+            # Show summary metrics
+            val_col1, val_col2, val_col3 = st.columns(3)
+            with val_col1:
+                st.metric("Total Rows", len(edited))
+            with val_col2:
+                st.metric("Valid Rows", sum(valid_mask))
+            with val_col3:
+                if invalid_count > 0:
+                    st.metric("Invalid Rows", invalid_count, delta=f"-{invalid_count}", delta_color="inverse")
+                else:
+                    st.metric("Invalid Rows", 0)
+            
             if invalid_count > 0:
-                st.metric("Invalid Rows", invalid_count, delta=f"-{invalid_count}", delta_color="inverse")
+                st.warning(f"⚠️ {invalid_count} row(s) have Sum ≠ 1.0 (will be auto-normalized during compute)")
+                # Show which rows are invalid
+                with st.expander("Show invalid rows"):
+                    invalid_indices = np.where(~valid_mask)[0]
+                    for idx in invalid_indices[:5]:  # Show first 5
+                        row_sum = sums.iloc[idx]
+                        st.write(f"Row {idx+1} (Site: {edited.iloc[idx]['Site_ID']}): Sum = {row_sum:.4f}")
+                    if len(invalid_indices) > 5:
+                        st.write(f"... and {len(invalid_indices) - 5} more")
             else:
-                st.metric("Invalid Rows", 0)
-        
-        if invalid_count > 0:
-            st.warning(f"⚠️ {invalid_count} row(s) have Sum ≠ 1.0 (will be auto-normalized during compute)")
-            # Show which rows are invalid
-            with st.expander("Show invalid rows"):
-                invalid_indices = np.where(~valid_mask)[0]
-                for idx in invalid_indices[:5]:  # Show first 5
-                    row_sum = sums.iloc[idx]
-                    st.write(f"Row {idx+1} (Site: {edited.iloc[idx]['Site_ID']}): Sum = {row_sum:.4f}")
-                if len(invalid_indices) > 5:
-                    st.write(f"... and {len(invalid_indices) - 5} more")
-        else:
-            st.success("✅ All rows valid!")
+                st.success("✅ All rows valid!")
 
 # ============ TAB: COMPUTE ============
 with tab_compute:

@@ -1,5 +1,7 @@
 # ProtonPulse
 
+<img src="INSTALL/assets/protonpulse_logo.png" align="right" alt="ProtonPulse Logo" width="150"/>
+
 **PTM Charge Distribution Analyzer** — Standalone desktop app for bench scientists
 
 Calculate charge variant distributions for post-translationally modified proteins using adaptive algorithms. No coding required—just click and analyze!
