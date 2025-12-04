@@ -205,17 +205,27 @@ def neutral_index_for_range(min_charge, max_charge):
     candidate = min(range(min_charge, max_charge + 1), key=lambda x: abs(x))
     return index_for_charge(candidate, min_charge)
 
+def parse_charge_from_column(col):
+    """Parse charge value from column name like P(-2), P(0), P(+3)"""
+    charge_str = col[2:-1]  # Extract content between P( and )
+    if charge_str.startswith('+'):
+        return int(charge_str[1:])
+    elif charge_str.startswith('-'):
+        return -int(charge_str[1:])
+    else:
+        return int(charge_str)
+
+def detect_charge_range_from_df(df):
+    """Detect min and max charge from dataframe columns"""
+    prob_cols = [col for col in df.columns if col.startswith("P(")]
+    if not prob_cols:
+        return -2, 2  # Default
+    charges = [parse_charge_from_column(col) for col in prob_cols]
+    return min(charges), max(charges)
+
 def yergeev_overall_charge_distribution(df, tol=1e-9):
     prob_cols = [col for col in df.columns if col.startswith("P(")]
-    charges = []
-    for col in prob_cols:
-        charge_str = col[2:-1]
-        if charge_str.startswith('+'):
-            charges.append(int(charge_str[1:]))
-        elif charge_str.startswith('-'):
-            charges.append(-int(charge_str[1:]))
-        else:
-            charges.append(int(charge_str))
+    charges = [parse_charge_from_column(col) for col in prob_cols]
     
     min_charge = min(charges)
     result_pmf = np.array([1.0])
@@ -253,15 +263,7 @@ def yergeev_overall_charge_distribution(df, tol=1e-9):
 def enumerate_charge_combinations(df, max_combinations=100000000, timeout=30):
     start_time = time.time()
     prob_cols = [col for col in df.columns if col.startswith("P(")]
-    charges = []
-    for col in prob_cols:
-        charge_str = col[2:-1]
-        if charge_str.startswith('+'):
-            charges.append(int(charge_str[1:]))
-        elif charge_str.startswith('-'):
-            charges.append(-int(charge_str[1:]))
-        else:
-            charges.append(int(charge_str))
+    charges = [parse_charge_from_column(col) for col in prob_cols]
     
     min_charge, max_charge = min(charges), max(charges)
     
@@ -517,40 +519,70 @@ with tab_input:
     c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
     
     with c1:
+        # Build charge options dynamically - include current range if custom
         charge_options = {
-            "3-state (-1…+1)": (-1, 1),
-            "5-state (-2…+2)": (-2, 2),
-            "7-state (-3…+3)": (-3, 3),
-            "9-state (-4…+4)": (-4, 4),
+            "3-state (-1 to +1)": (-1, 1),
+            "5-state (-2 to +2)": (-2, 2),
+            "7-state (-3 to +3)": (-3, 3),
+            "9-state (-4 to +4)": (-4, 4),
+            "11-state (-5 to +5)": (-5, 5),
+            "13-state (-6 to +6)": (-6, 6),
+            "15-state (-7 to +7)": (-7, 7),
+            "21-state (-10 to +10)": (-10, 10),
         }
-        current_key = f"{st.session_state.max_charge - st.session_state.min_charge + 1}-state ({st.session_state.min_charge}…+{st.session_state.max_charge})"
+        
+        # Detect current range from loaded data
+        current_min = st.session_state.min_charge
+        current_max = st.session_state.max_charge
+        n_states = current_max - current_min + 1
+        current_key = f"{n_states}-state ({current_min} to +{current_max})"
+        
+        # Add current range to options if not already present
         if current_key not in charge_options:
-            current_key = "5-state (-2…+2)"
+            charge_options[current_key] = (current_min, current_max)
         
-        selection = st.selectbox("🔢 Charge Range", list(charge_options.keys()),
-                                 index=list(charge_options.keys()).index(current_key),
-                                 key="input_charge_range")
-        new_min, new_max = charge_options[selection]
+        # Sort options by number of states
+        sorted_options = dict(sorted(charge_options.items(), key=lambda x: x[1][1] - x[1][0]))
+        option_keys = list(sorted_options.keys())
         
-        if new_min != st.session_state.min_charge or new_max != st.session_state.max_charge:
-            st.session_state.min_charge = new_min
-            st.session_state.max_charge = new_max
-            new_cols = generate_charge_columns(new_min, new_max)
-            neutral_idx = neutral_index_for_range(new_min, new_max)
-            probs1 = [0.0] * (new_max - new_min + 1)
-            probs2 = [0.0] * (new_max - new_min + 1)
-            probs1[neutral_idx] = 1.0
-            probs2[neutral_idx] = 0.6
-            if new_min <= -1 <= new_max:
-                probs2[index_for_charge(-1, new_min)] = 0.2
-            if new_min <= 1 <= new_max:
-                probs2[index_for_charge(1, new_min)] = 0.2
-            st.session_state.df = pd.DataFrame([
-                ["Site_1", 1] + probs1,
-                ["Site_2", 1] + probs2,
-            ], columns=new_cols)
-            st.session_state.last_results = None
-            st.rerun()
+        # Find the index of current selection
+        try:
+            current_index = option_keys.index(current_key)
+        except ValueError:
+            current_index = 1  # Default to 5-state
+        
+        # Only show the selector if NOT in csv_loaded mode (to prevent accidental reset)
+        if st.session_state.csv_loaded:
+            # Show read-only display of current range
+            st.info(f"📊 Loaded: {n_states}-state ({current_min} to +{current_max})")
+            if st.button("🔄 Change Range", key="btn_change_range", help="Reset data and choose a different charge range"):
+                st.session_state.csv_loaded = False
+                st.rerun()
+        else:
+            selection = st.selectbox("🔢 Charge Range", option_keys,
+                                     index=current_index,
+                                     key="input_charge_range")
+            new_min, new_max = sorted_options[selection]
+            
+            if new_min != st.session_state.min_charge or new_max != st.session_state.max_charge:
+                st.session_state.min_charge = new_min
+                st.session_state.max_charge = new_max
+                new_cols = generate_charge_columns(new_min, new_max)
+                neutral_idx = neutral_index_for_range(new_min, new_max)
+                probs1 = [0.0] * (new_max - new_min + 1)
+                probs2 = [0.0] * (new_max - new_min + 1)
+                probs1[neutral_idx] = 1.0
+                probs2[neutral_idx] = 0.6
+                if new_min <= -1 <= new_max:
+                    probs2[index_for_charge(-1, new_min)] = 0.2
+                if new_min <= 1 <= new_max:
+                    probs2[index_for_charge(1, new_min)] = 0.2
+                st.session_state.df = pd.DataFrame([
+                    ["Site_1", 1] + probs1,
+                    ["Site_2", 1] + probs2,
+                ], columns=new_cols)
+                st.session_state.last_results = None
+                st.rerun()
     
     with c2:
         if st.button("📄 Load 100-site template", key="btn_template"):
@@ -694,11 +726,15 @@ with tab_compute:
             try:
                 df_compute = df.copy()
                 if prob_cols:
+                    # Detect charge range from the actual data columns
+                    data_min_charge, data_max_charge = detect_charge_range_from_df(df_compute)
+                    
                     for idx, row in df_compute.iterrows():
                         probs = row[prob_cols].astype(float).fillna(0.0)
                         s = probs.sum()
                         if s <= 0:
-                            neutral_idx = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+                            # Use detected range from data, not session state
+                            neutral_idx = neutral_index_for_range(data_min_charge, data_max_charge)
                             probs = pd.Series(0.0, index=prob_cols)
                             probs.iloc[neutral_idx] = 1.0
                         else:
@@ -715,7 +751,11 @@ with tab_compute:
                     elapsed = time.time() - start
                     method_used = "Yergeev"
                 
-                window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -5, +5)
+                # Use dynamic window based on total copies and charge range
+                # Window should be large enough to capture most of the distribution
+                total_copies_for_window = int(df_compute['Copies'].sum())
+                window_size = max(10, min(total_copies_for_window * 2, 50))  # Dynamic window
+                window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -window_size, +window_size)
                 
                 st.session_state.last_results = {
                     "window_df": window_df,
@@ -723,7 +763,8 @@ with tab_compute:
                     "tail_high": tail_high,
                     "elapsed": elapsed,
                     "method": method_used,
-                    "total_copies": total_copies
+                    "total_copies": total_copies,
+                    "window_size": window_size
                 }
             except Exception as e:
                 st.error(f"Error: {e}")
