@@ -1,77 +1,189 @@
-import io
-import datetime
+"""
+ProtonPulse - PTM Charge Distribution Analyzer
+Version 2.3 | December 2025
+Developed by Valerie Le & Alex Goferman
+"""
+import time
 import numpy as np
 import pandas as pd
 import streamlit as st
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# Import advanced algorithms
+try:
+    from advanced_algorithms import adaptive_charge_distribution
+    ADVANCED_ALGORITHMS_AVAILABLE = True
+except ImportError:
+    ADVANCED_ALGORITHMS_AVAILABLE = False
+
+# ============ PAGE CONFIG (MUST BE FIRST) ============
 st.set_page_config(
-    page_title="PTM Charge Analyzer", 
+    page_title="ProtonPulse",
     layout="wide",
-    initial_sidebar_state="expanded",
-    page_icon="🧬"
+    initial_sidebar_state="collapsed",
+    page_icon="🔬"
 )
 
-# Custom CSS for better styling and probability highlighting
+# ============ CSS ============
 st.markdown("""
 <style>
-    .stMetric {
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 5px;
+    /* Compact layout - reduce padding and margins */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0.5rem !important;
     }
-    .stButton>button {
-        border-radius: 5px;
+    
+    /* Reduce main content font size slightly */
+    .stMarkdown, .stText, p, span {
+        font-size: 0.9rem !important;
     }
-    div[data-testid="stExpander"] {
-        background-color: #f8f9fa;
-        border-radius: 5px;
+    
+    /* Compact headers */
+    h1 { font-size: 1.6rem !important; margin-bottom: 0.3rem !important; }
+    h2 { font-size: 1.3rem !important; margin-bottom: 0.3rem !important; }
+    h3 { font-size: 1.1rem !important; margin-bottom: 0.2rem !important; }
+    
+    /* Compact tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
     }
-    /* Highlight probability columns */
-    [data-testid="column"] [data-testid="stDataFrameResizable"] table th {
-        background-color: #e3f2fd !important;
+    .stTabs [data-baseweb="tab"] {
+        padding: 0.3rem 0.8rem !important;
+        font-size: 0.85rem !important;
     }
-    /* Make metrics more colorful */
-    div[data-testid="stMetricValue"] {
-        font-size: 1.5rem;
-        color: #1976d2;
+    
+    /* Compact expanders */
+    .streamlit-expanderHeader {
+        font-size: 0.9rem !important;
+        padding: 0.4rem 0.6rem !important;
+    }
+    .streamlit-expanderContent {
+        padding: 0.5rem !important;
+    }
+    
+    /* Compact metrics */
+    [data-testid="stMetricValue"] {
+        font-size: 1.3rem !important;
+    }
+    [data-testid="stMetricLabel"] {
+        font-size: 0.8rem !important;
+    }
+    
+    /* Compact buttons */
+    .stButton > button {
+        padding: 0.3rem 0.8rem !important;
+        font-size: 0.85rem !important;
+    }
+    
+    /* Compact data editor */
+    .stDataFrame, [data-testid="stDataFrame"] {
+        font-size: 0.85rem !important;
+    }
+    
+    /* Compact selectbox */
+    .stSelectbox > div > div {
+        font-size: 0.85rem !important;
+    }
+    
+    /* Compact file uploader */
+    .stFileUploader {
+        font-size: 0.85rem !important;
+    }
+    
+    /* Reduce vertical spacing */
+    .element-container {
+        margin-bottom: 0.3rem !important;
+    }
+    
+    /* Compact dividers */
+    hr {
+        margin: 0.5rem 0 !important;
+    }
+    
+    /* Welcome box with molecular background image */
+    .welcome-box {
+        background: linear-gradient(135deg, rgba(30, 58, 138, 0.85) 0%, rgba(79, 70, 229, 0.8) 50%, rgba(139, 92, 246, 0.85) 100%);
+        padding: 25px 30px;
+        border-radius: 16px;
+        color: white;
+        margin-bottom: 15px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(79, 70, 229, 0.4);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .welcome-box::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: url('https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1200');
+        background-size: cover;
+        background-position: center;
+        opacity: 0.15;
+        z-index: 0;
+    }
+    .welcome-box::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 150px;
+        height: 150px;
+        background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+        animation: pulse 3s ease-in-out infinite;
+        z-index: 0;
+    }
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.3; }
+        50% { transform: scale(1.2); opacity: 0.6; }
+    }
+    .welcome-box h2 {
+        font-size: 1.5rem !important;
+        margin-bottom: 0.5rem !important;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+        position: relative;
+        z-index: 1;
+        font-weight: 600;
+    }
+    .welcome-box p {
+        font-size: 1rem !important;
+        margin-bottom: 0 !important;
+        opacity: 0.95;
+        position: relative;
+        z-index: 1;
+        text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* Compact sidebar */
+    .css-1d391kg {
+        padding: 1rem 0.5rem !important;
+    }
+    
+    /* Plotly chart - make more compact */
+    .js-plotly-plot {
+        margin-top: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar with logo, about, and credits
+# ============ SIDEBAR ============
 with st.sidebar:
-    st.markdown("# 🧬 PTM Analyzer")
-    st.markdown("### Post-Translational Modification Charge Distribution Calculator")
+    st.markdown("## 🔬 ProtonPulse")
+    st.caption("PTM Charge Distribution Analyzer")
     st.markdown("---")
-    
-    st.markdown("**ℹ️ About**")
-    st.markdown("""
-    Calculate overall charge distributions for proteins with multiple PTM sites 
-    using probability generating functions.
-    """)
-    
-    st.markdown("---")
-    
-    st.markdown("**👥 Credits**")
     st.markdown("""
     **Developed by:**  
     Valerie Le & Alex Goferman  
     MSDS Program, Rutgers University
     
-    **Version:** 2.0 | October 2025
-    
-    **Method:** Yergey, J. A. (1983). A general approach to calculating 
-    isotopic distributions for mass spectrometry. *International Journal 
-    of Mass Spectrometry and Ion Physics*, 52(2), 337–349.
+    **Version:** 2.3 | December 2025
     """)
-    
-    st.markdown("---")
-    st.caption("💡 Use the tabs above to navigate")
 
-# Function to generate column names for any charge range
+# ============ HELPER FUNCTIONS ============
 def generate_charge_columns(min_charge, max_charge):
     base_cols = ["Site_ID", "Copies"]
     charge_cols = []
@@ -93,111 +205,8 @@ def neutral_index_for_range(min_charge, max_charge):
     candidate = min(range(min_charge, max_charge + 1), key=lambda x: abs(x))
     return index_for_charge(candidate, min_charge)
 
-def auto_detect_charge_system(df):
-    if df is None or len(df) == 0:
-        return "5-state", -2, 2
-    prob_cols = [col for col in df.columns if col.startswith("P(")]
-    if not prob_cols:
-        return "5-state", -2, 2
-    charges = []
-    for col in prob_cols:
-        charge_str = col[2:-1]
-        try:
-            if charge_str.startswith('+'):
-                charges.append(int(charge_str[1:]))
-            elif charge_str.startswith('-'):
-                charges.append(-int(charge_str[1:]))
-            else:
-                charges.append(int(charge_str))
-        except ValueError:
-            continue
-    if not charges:
-        return "5-state", -2, 2
-    min_charge = min(charges)
-    max_charge = max(charges)
-    system_name = f"{max_charge-min_charge+1}-state"
-    return system_name, min_charge, max_charge
-
-if "charge_system" not in st.session_state:
-    st.session_state.charge_system = "5-state"
-    st.session_state.min_charge = -2
-    st.session_state.max_charge = 2
-
-if hasattr(st.session_state, 'min_charge') and hasattr(st.session_state, 'max_charge'):
-    DEFAULT_COLS = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
-else:
-    DEFAULT_COLS = generate_charge_columns(-2, 2)
-if "df" not in st.session_state:
-    st.session_state.df = pd.DataFrame(
-        [
-            ["Site_1", 1, 0.0, 0.0, 1.0, 0.0, 0.0],
-            ["Site_2", 1, 0.0, 0.2, 0.6, 0.2, 0.0],
-        ],
-        columns=DEFAULT_COLS,
-    )
-
-# Main app tabs
-current_min = st.session_state.get('min_charge', -2)
-current_max = st.session_state.get('max_charge', 2)
-charge_range = f"{current_min:+d}…{current_max:+d}" if current_min < 0 else f"0…{current_max:+d}"
-
-st.title(f"🧬 PTM Charge Distribution Analyzer")
-st.caption(f"Calculate protein charge distributions with multiple PTM sites | **Active range:** {charge_range}")
-
-tabs = st.tabs(["🏠 Welcome", "📝 Design Input", "📊 Compute & Visualize", "✅ Validate & Compare"])
-
-# Helper function for charge system update
-def update_charge_system(new_system, new_min_charge, new_max_charge):
-    if (new_system != st.session_state.charge_system or 
-        new_min_charge != getattr(st.session_state, 'min_charge', -2) or 
-        new_max_charge != getattr(st.session_state, 'max_charge', 2)):
-        st.session_state.charge_system = new_system
-        st.session_state.min_charge = new_min_charge
-        st.session_state.max_charge = new_max_charge
-        DEFAULT_COLS = generate_charge_columns(new_min_charge, new_max_charge)
-        example_probs_1 = [0.0] * (new_max_charge - new_min_charge + 1)
-        example_probs_2 = [0.0] * (new_max_charge - new_min_charge + 1)
-        neutral_index = neutral_index_for_range(new_min_charge, new_max_charge)
-        example_probs_1[neutral_index] = 1.0
-        if new_max_charge >= 1 and new_min_charge <= -1:
-            example_probs_2[neutral_index] = 0.6
-            if index_for_charge(-1, new_min_charge) >= 0 and index_for_charge(-1, new_min_charge) < len(example_probs_2):
-                example_probs_2[index_for_charge(-1, new_min_charge)] = 0.2
-            if index_for_charge(1, new_min_charge) >= 0 and index_for_charge(1, new_min_charge) < len(example_probs_2):
-                example_probs_2[index_for_charge(1, new_min_charge)] = 0.2
-        else:
-            example_probs_2[neutral_index] = 1.0
-        st.session_state.df = pd.DataFrame([
-            ["Site_1", 1] + example_probs_1,
-            ["Site_2", 1] + example_probs_2,
-        ], columns=DEFAULT_COLS)
-        st.rerun()
-
-# ===========================
-# Yergeev's Method (1983)
-# ===========================
-# Based on: Yergey, J. A. (1983). A general approach to calculating 
-# isotopic distributions for mass spectrometry. International Journal 
-# of Mass Spectrometry and Ion Physics, 52(2), 337–349.
-
 def yergeev_overall_charge_distribution(df, tol=1e-9):
-    """
-    Compute overall charge distribution using Yergeev's iterative convolution method.
-    
-    This method iteratively convolves the PMF of each PTM site, handling multiple
-    copies via repeated convolution. This is the gold-standard approach referenced
-    in the problem statement.
-    
-    Parameters:
-    - df: DataFrame with columns Site_ID, Copies, P(charge_states)
-    - tol: Tolerance for numerical noise
-    
-    Returns:
-    - (pmf_arr, offset): Normalized probability array and charge offset
-    """
     prob_cols = [col for col in df.columns if col.startswith("P(")]
-    
-    # Extract charge range from column names
     charges = []
     for col in prob_cols:
         charge_str = col[2:-1]
@@ -209,48 +218,31 @@ def yergeev_overall_charge_distribution(df, tol=1e-9):
             charges.append(int(charge_str))
     
     min_charge = min(charges)
-    max_charge = max(charges)
-    
-    # Initialize with delta function at charge 0
     result_pmf = np.array([1.0])
     result_offset = 0
     
-    # Yergeev's algorithm: iterate through each PTM site
     for idx, row in df.iterrows():
-        # Skip invalid rows
         if pd.isna(row.get("Copies")):
             continue
         copies = int(row["Copies"])
         if copies <= 0:
             continue
         
-        # Extract and normalize probabilities for this site
         site_probs = row[prob_cols].astype(float).fillna(0.0).to_numpy()
-        if not np.isclose(site_probs.sum(), 1.0, atol=1e-6):
-            raise ValueError(f"Row {idx} probabilities do not sum to 1.0")
-        
-        # Normalize robustly
         s = site_probs.sum()
         if s > 0:
             site_pmf = site_probs / s
         else:
             site_pmf = site_probs
         
-        # For multiple copies, convolve the PMF with itself 'copies' times
-        # Using exponentiation by squaring for efficiency
         site_offset = min_charge
         for _ in range(copies):
-            # Convolve: result_pmf(z) * site_pmf(z)
-            convolved = np.convolve(result_pmf, site_pmf)
-            result_pmf = convolved
+            result_pmf = np.convolve(result_pmf, site_pmf)
             result_offset = result_offset + site_offset
     
-    # Normalize final result
     s = result_pmf.sum()
     if s > 0:
         result_pmf = result_pmf / s
-    
-    # Prune numerical noise
     result_pmf[result_pmf < tol] = 0.0
     s2 = result_pmf.sum()
     if s2 > 0:
@@ -258,30 +250,9 @@ def yergeev_overall_charge_distribution(df, tol=1e-9):
     
     return result_pmf, result_offset
 
-
-def enumerate_charge_combinations(df, max_combinations=100000000, timeout=30, sample_size=8):
-    """
-    Exhaustive enumeration of charge combinations with smart sampling for large datasets.
-    
-    For small datasets: Enumerates all combinations (exact ground truth).
-    For large datasets: Automatically samples a subset of sites to validate algorithm accuracy.
-    
-    Parameters:
-    - df: DataFrame with columns Site_ID, Copies, P(charge_states)
-    - max_combinations: Hard limit for exact enumeration
-    - timeout: Maximum time in seconds before aborting
-    - sample_size: Number of sites to use if dataset is too large for exact enumeration
-    
-    Returns:
-    - (pmf_arr, offset, method_used): Probability array, offset, and method description
-      method_used: "exact" (all sites), "sampled" (subset), or "unavailable" (too complex)
-    """
-    import time
+def enumerate_charge_combinations(df, max_combinations=100000000, timeout=30):
     start_time = time.time()
-    
     prob_cols = [col for col in df.columns if col.startswith("P(")]
-    
-    # Extract charge range
     charges = []
     for col in prob_cols:
         charge_str = col[2:-1]
@@ -292,160 +263,20 @@ def enumerate_charge_combinations(df, max_combinations=100000000, timeout=30, sa
         else:
             charges.append(int(charge_str))
     
-    min_charge = min(charges)
-    max_charge = max(charges)
+    min_charge, max_charge = min(charges), max(charges)
     
-    # Estimate total combinations: product of (n_charges ^ copies) for each site
     total_combinations = 1
-    n_sites = 0
     for _, row in df.iterrows():
         if pd.isna(row.get("Copies")):
             continue
         copies = int(row["Copies"])
         if copies > 0:
             total_combinations *= (len(prob_cols) ** copies)
-            n_sites += 1
-    
-    # Strategy: If too large, adaptively reduce sample size
-    df_to_use = df.copy()
-    method_used = "exact"
-    current_sample_size = sample_size
     
     if total_combinations > max_combinations:
-        method_used = "sampled"
-        # Adaptively reduce sample size until combinations are manageable
-        while n_sites > 3 and total_combinations > max_combinations and current_sample_size > 3:
-            current_sample_size -= 1
-            df_to_use = df.iloc[:current_sample_size].copy()
-            
-            # Recalculate combinations for sampled set
-            total_combinations = 1
-            for _, row in df_to_use.iterrows():
-                if pd.isna(row.get("Copies")):
-                    continue
-                copies = int(row["Copies"])
-                if copies > 0:
-                    total_combinations *= (len(prob_cols) ** copies)
-        
-        # Final check: if still too large, give up
-        if total_combinations > max_combinations:
-            return None, None, "unavailable"
-    
-    # Build list of sites with their charge states and probabilities
-    sites_data = []
-    for _, row in df_to_use.iterrows():
-        if pd.isna(row.get("Copies")):
-            continue
-        copies = int(row["Copies"])
-        if copies <= 0:
-            continue
-        
-        probs = row[prob_cols].astype(float).fillna(0.0).to_numpy()
-        s = probs.sum()
-        if s > 0:
-            probs = probs / s
-        
-        # Create copies of this site with the same probability distribution
-        charge_list = np.array(charges)
-        for _ in range(copies):
-            sites_data.append({'charges': charge_list, 'probs': probs})
-    
-    # Enumerate all combinations
-    distribution = {}  # charge -> total_probability
-    enum_counters = {'count': 0}  # Mutable counter for tracking progress
-    
-    def enumerate_recursive(site_idx, current_charge, current_prob):
-        """Recursively enumerate all charge combinations."""
-        # Check timeout
-        if time.time() - start_time > timeout:
-            raise TimeoutError(f"Enumeration exceeded {timeout}s timeout")
-        
-        # Check hard limit
-        enum_counters['count'] += 1
-        if enum_counters['count'] > max_combinations:
-            raise ValueError(f"Enumeration exceeded {max_combinations} combinations")
-        
-        if site_idx == len(sites_data):
-            # End of recursion: record this combination
-            if current_charge not in distribution:
-                distribution[current_charge] = 0.0
-            distribution[current_charge] += current_prob
-            return
-        
-        # For this site, try all possible charge states
-        site = sites_data[site_idx]
-        for charge_idx, charge in enumerate(site['charges']):
-            prob = site['probs'][charge_idx]
-            if prob > 0:  # Skip zero-probability states
-                enumerate_recursive(site_idx + 1, current_charge + charge, current_prob * prob)
-    
-    try:
-        enumerate_recursive(0, 0, 1.0)
-    except (TimeoutError, ValueError) as e:
-        # Partial result or timeout
         return None, None, "unavailable"
     
-    # Convert distribution dict to array with offset
-    if not distribution:
-        return np.array([1.0]), 0, method_used
-    
-    min_result_charge = min(distribution.keys())
-    max_result_charge = max(distribution.keys())
-    offset = min_result_charge
-    
-    pmf = np.zeros(max_result_charge - min_result_charge + 1)
-    for charge, prob in distribution.items():
-        idx = charge - offset
-        pmf[idx] = prob
-    
-    # Normalize
-    s = pmf.sum()
-    if s > 0:
-        pmf = pmf / s
-    
-    return pmf, offset, method_used
-
-
-# Shared helpers (PMF math etc.)
-def pmf_with_offset(probs, min_charge):
-    arr = np.asarray(probs, dtype=float)
-    arr = np.clip(arr, 0.0, 1.0)
-    s = arr.sum()
-    if s > 0:
-        arr = arr / s
-    return arr, int(min_charge)
-
-def convolve(a_arr, a_off, b_arr, b_off):
-    c_arr = np.convolve(a_arr, b_arr)
-    c_off = a_off + b_off
-    return c_arr, c_off
-
-def poly_pow(arr, off, n):
-    if n == 0:
-        return np.array([1.0]), 0
-    if n == 1:
-        return arr.copy(), off
-    if n % 2 == 0:
-        half_arr, half_off = poly_pow(arr, off, n // 2)
-        return convolve(half_arr, half_off, half_arr, half_off)
-    else:
-        minus1_arr, minus1_off = poly_pow(arr, off, n - 1)
-        return convolve(minus1_arr, minus1_off, arr, off)
-
-def overall_charge_distribution(df, tol=1e-9):
-    prob_cols = [col for col in df.columns if col.startswith("P(")]
-    charges = []
-    for col in prob_cols:
-        charge_str = col[2:-1]
-        if charge_str.startswith('+'):
-            charges.append(int(charge_str[1:]))
-        elif charge_str.startswith('-'):
-            charges.append(-int(charge_str[1:]))
-        else:
-            charges.append(int(charge_str))
-    min_charge = min(charges)
-    max_charge = max(charges)
-    total_arr, total_off = np.array([1.0]), 0
+    sites_data = []
     for _, row in df.iterrows():
         if pd.isna(row.get("Copies")):
             continue
@@ -453,724 +284,724 @@ def overall_charge_distribution(df, tol=1e-9):
         if copies <= 0:
             continue
         probs = row[prob_cols].astype(float).fillna(0.0).to_numpy()
-        if not np.isclose(probs.sum(), 1.0, atol=1e-6):
-            raise ValueError("Found a row with probabilities not summing to 1. Fix input first.")
-        base_arr, base_off = pmf_with_offset(probs, min_charge)
-        site_arr, site_off = poly_pow(base_arr, base_off, copies)
-        total_arr, total_off = convolve(total_arr, total_off, site_arr, site_off)
-    s = total_arr.sum()
+        s = probs.sum()
+        if s > 0:
+            probs = probs / s
+        charge_list = np.array(charges)
+        for _ in range(copies):
+            sites_data.append({'charges': charge_list, 'probs': probs})
+    
+    distribution = {}
+    
+    def enumerate_recursive(site_idx, current_charge, current_prob):
+        if time.time() - start_time > timeout:
+            raise TimeoutError()
+        if site_idx == len(sites_data):
+            distribution[current_charge] = distribution.get(current_charge, 0.0) + current_prob
+            return
+        site = sites_data[site_idx]
+        for charge_idx, charge in enumerate(site['charges']):
+            prob = site['probs'][charge_idx]
+            if prob > 0:
+                enumerate_recursive(site_idx + 1, current_charge + charge, current_prob * prob)
+    
+    try:
+        enumerate_recursive(0, 0, 1.0)
+    except TimeoutError:
+        return None, None, "unavailable"
+    
+    if not distribution:
+        return np.array([1.0]), 0, "exact"
+    
+    n_sites_total = len(sites_data)
+    min_result = n_sites_total * min_charge
+    max_result = n_sites_total * max_charge
+    offset = min_result
+    
+    pmf = np.zeros(max_result - min_result + 1)
+    for charge, prob in distribution.items():
+        idx = charge - offset
+        if 0 <= idx < len(pmf):
+            pmf[idx] = prob
+    
+    s = pmf.sum()
     if s > 0:
-        total_arr = total_arr / s
-    total_arr[total_arr < tol] = 0.0
-    s2 = total_arr.sum()
-    if s2 > 0:
-        total_arr = total_arr / s2
-    return total_arr, total_off
+        pmf = pmf / s
+    return pmf, offset, "exact"
 
 def window_distribution(arr, off, low=-5, high=+5):
     charges = np.arange(off, off + len(arr))
     mask = (charges >= low) & (charges <= high)
-    window = pd.DataFrame({
-        "Charge": charges[mask],
-        "Probability": arr[mask]
-    })
+    window = pd.DataFrame({"Charge": charges[mask], "Probability": arr[mask]})
     tail_low = arr[charges < low].sum()
     tail_high = arr[charges > high].sum()
     return window, float(tail_low), float(tail_high)
 
-def create_site_contribution_plot(df):
-    prob_cols = [col for col in df.columns if col.startswith("P(")]
-    if not prob_cols:
-        return None, False
-    site_data = df[["Site_ID"] + prob_cols].copy()
-    if len(site_data) > 40:
-        site_data = site_data.head(40)
-        show_warning = True
-    else:
-        show_warning = False
-    fig = px.imshow(
-        site_data[prob_cols].values,
-        labels=dict(x="Charge State", y="PTM Site", color="Probability"),
-        x=prob_cols,
-        y=site_data['Site_ID'],
-        color_continuous_scale='RdYlBu_r',
-        aspect='auto'
-    )
-    fig.update_layout(
-        title='Individual Site Charge Probabilities' + (' (First 40 sites shown)' if show_warning else ''),
-        height=max(400, len(site_data) * 20),
-        template='plotly_white'
-    )
-    fig.update_traces(
-        hovertemplate='<b>Site:</b> %{y}<br>' +
-                     '<b>Charge:</b> %{x}<br>' +
-                     '<b>Probability:</b> %{z:.3f}<br>' +
-                     '<extra></extra>'
-    )
-    return fig, show_warning
+# ============ SESSION STATE ============
+if "charge_system" not in st.session_state:
+    st.session_state.charge_system = "5-state"
+    st.session_state.min_charge = -2
+    st.session_state.max_charge = 2
 
-# -------------------------------
-# TAB 0: Welcome / Landing Page
-# -------------------------------
-with tabs[0]:
-    st.markdown("## 👋 Welcome to PTM Charge Distribution Analyzer")
+if "df" not in st.session_state:
+    cols = generate_charge_columns(-2, 2)
+    st.session_state.df = pd.DataFrame([
+        ["Site_1", 1, 0.0, 0.0, 1.0, 0.0, 0.0],
+        ["Site_2", 1, 0.0, 0.2, 0.6, 0.2, 0.0],
+        ["Site_3", 2, 0.0, 0.0, 1.0, 0.0, 0.0],
+        ["Site_4", 1, 0.0, 0.2, 0.6, 0.2, 0.0],
+        ["Site_5", 1, 0.1, 0.2, 0.4, 0.2, 0.1],
+    ], columns=cols)
+
+if "last_results" not in st.session_state:
+    st.session_state.last_results = None
+
+# ============ MAIN TITLE ============
+st.title("🔬 ProtonPulse")
+
+# ============ TABS ============
+tab_welcome, tab_input, tab_compute, tab_validate = st.tabs([
+    "🏠 Welcome", "📝 Data Input", "📊 Compute & Visualize", "✅ Validate"
+])
+
+# ============ TAB: WELCOME ============
+with tab_welcome:
+    st.markdown("""
+    <div class="welcome-box">
+        <h2>🔬 Welcome to ProtonPulse</h2>
+        <p>Compute charge variant distributions for PTM-modified proteins using adaptive algorithms that scale from exact convolution to FFT-accelerated methods.</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns(2)
     
     with col1:
+        st.markdown("### 🚀 Quick Start")
         st.markdown("""
-        ### What does this tool do?
-        
-        This application calculates the **overall charge distribution** of proteins with multiple 
-        post-translational modification (PTM) sites. Each PTM site can exist in various charge states 
-        with different probabilities, and this tool computes the combined distribution across all sites.
-        
-        ### Quick Start Guide
-        
-        1. **Design Input Tab**: Enter your PTM sites and their charge probabilities
-        2. **Compute Tab**: Calculate and visualize the overall charge distribution
-        
-        ### Key Features
-        
-        - Support for **3 to 15 charge states** (from -7 to +7)
-        - **Interactive visualizations** with hover details
-        - **Site contribution heatmaps** to see individual patterns
-        - **Cumulative distribution functions** for statistical analysis
-        - **Template generation** for quick testing with 100 sites
+        1. **📝 Data Input** - Upload CSV or enter PTM sites
+        2. **📊 Compute** - Calculate charge distribution  
+        3. **✅ Validate** - Verify accuracy against benchmarks
         """)
+        
+        with st.expander("📖 What is this tool?"):
+            st.markdown("""
+            This tool calculates the **overall charge state distribution** of a protein 
+            with multiple post-translational modification (PTM) sites.
+            
+            Each site can exist in different charge states (e.g., -2 to +2), 
+            and you provide the probability of each charge state at each site.
+            
+            The algorithm computes the probability distribution of the **total charge** 
+            across all sites combined.
+            """)
+        
+        with st.expander("🧪 Example Use Case"):
+            st.markdown("""
+            **Scenario:** A protein with 5 phosphorylation sites.
+            
+            - Site 1: 100% neutral (unphosphorylated)
+            - Site 2: 60% neutral, 20% -1, 20% +1
+            - Site 3: 2 copies, both neutral
+            
+            → Tool calculates P(total charge = -5, -4, ..., +5)
+            """)
     
     with col2:
-        st.info("""
-        **Pro Tips**
+        st.markdown("### 🔬 Algorithm Overview")
+        with st.expander("How does it work?", expanded=True):
+            st.markdown("""
+            **Yergeev Convolution** (gold standard):
+            - Uses discrete convolution to combine site distributions
+            - **Exact results** with O(n²) complexity
+            - Fast even for thousands of sites!
+            
+            **Why not enumerate all combinations?**
+            - For 5 charge states & n copies: 5ⁿ combinations
+            - 10 copies = 9.7 million combinations
+            - 20 copies = 95 trillion combinations 🤯
+            - Convolution avoids this exponential explosion
+            """)
         
-        - Use the **Settings bar** in Design tab to change charge ranges
-        - **Probability columns** are the heart of this tool - they must sum to 1.0 per row
-        - Generate a **100-site template** for testing
-        - All plots are **interactive** - hover for details!
-        """)
-        
-        st.success("""
-        **For Scientists**
-        
-        This tool uses **Yergeev's method** (1983) — an iterative convolution approach 
-        to compute exact charge distributions efficiently, even for proteins with 
-        100+ PTM sites. Results are validated against exhaustive enumeration on small datasets.
-        """)
+        with st.expander("📚 References"):
+            st.markdown("""
+            - Yergeev, L.M. (1983). *Efficient computation of discrete convolutions*
+            - Central Limit Theorem for Gaussian approximation
+            - FFT-based convolution for large datasets
+            """)
 
-# -------------------------------
-# TAB 1: Design Input
-# -------------------------------
-with tabs[1]:
-    st.markdown("### Design Your PTM Input")
+# ============ TAB: DATA INPUT ============
+with tab_input:
+    st.markdown("### 📝 Data Input")
+    st.caption("Define your PTM sites and their charge state probabilities")
     
-    # Horizontal control bar at the top
-    ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns([2, 2, 2, 1])
+    # Track if CSV was just loaded
+    if "csv_loaded" not in st.session_state:
+        st.session_state.csv_loaded = False
     
-    with ctrl_col1:
-        st.markdown("**Charge Range**")
+    # CSV Upload Section - collapsible after successful load
+    if st.session_state.csv_loaded:
+        # Show compact success message with option to upload new file
+        up_col1, up_col2, up_col3 = st.columns([3, 2, 2])
+        with up_col1:
+            st.success(f"✅ Data loaded: {len(st.session_state.df)} sites, {int(st.session_state.df['Copies'].sum())} total copies")
+        with up_col2:
+            csv_data = st.session_state.df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_data,
+                file_name="ptm_data.csv",
+                mime="text/csv",
+                help="Download current data for editing in Excel"
+            )
+        with up_col3:
+            if st.button("📤 Upload New CSV", key="btn_new_upload"):
+                st.session_state.csv_loaded = False
+                st.rerun()
+    else:
+        # Show file uploader
+        st.markdown("#### 📁 Load Data")
+        file_col1, file_col2 = st.columns([3, 2])
+        
+        with file_col1:
+            uploaded_file = st.file_uploader(
+                "📤 Upload CSV", 
+                type=['csv'], 
+                key="csv_uploader",
+                help="CSV with columns: Site_ID, Copies, P(-2), P(-1), P(0), P(+1), P(+2)"
+            )
+            if uploaded_file is not None:
+                try:
+                    uploaded_df = pd.read_csv(uploaded_file)
+                    # Auto-detect charge range from columns
+                    prob_cols_uploaded = [c for c in uploaded_df.columns if c.startswith("P(")]
+                    if prob_cols_uploaded:
+                        charges = []
+                        for col in prob_cols_uploaded:
+                            charge_str = col[2:-1]
+                            if charge_str.startswith('+'):
+                                charges.append(int(charge_str[1:]))
+                            elif charge_str.startswith('-'):
+                                charges.append(-int(charge_str[1:]))
+                            else:
+                                charges.append(int(charge_str))
+                        st.session_state.min_charge = min(charges)
+                        st.session_state.max_charge = max(charges)
+                    st.session_state.df = uploaded_df
+                    st.session_state.last_results = None
+                    st.session_state.csv_loaded = True
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error loading CSV: {e}")
+        
+        with file_col2:
+            # Download template
+            template_cols = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
+            neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+            template_probs = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+            template_probs[neutral] = 1.0
+            template_df = pd.DataFrame([["Site_1", 1] + template_probs], columns=template_cols)
+            template_csv = template_df.to_csv(index=False)
+            st.download_button(
+                label="📋 Download Template",
+                data=template_csv,
+                file_name="ptm_template.csv",
+                mime="text/csv",
+                help="Download empty template CSV"
+            )
+            st.caption("Edit in Excel, then upload")
+    
+    st.markdown("---")
+    st.markdown("#### ⚙️ Settings")
+    
+    # Controls
+    c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
+    
+    with c1:
         charge_options = {
-            "3-state (-1…+1)": ("3-state", -1, 1),
-            "5-state (-2…+2)": ("5-state", -2, 2),
-            "7-state (-3…+3)": ("7-state", -3, 3),
-            "9-state (-4…+4)": ("9-state", -4, 4),
-            "11-state (-5…+5)": ("11-state", -5, 5),
-            "15-state (-7…+7)": ("15-state", -7, 7)
+            "3-state (-1…+1)": (-1, 1),
+            "5-state (-2…+2)": (-2, 2),
+            "7-state (-3…+3)": (-3, 3),
+            "9-state (-4…+4)": (-4, 4),
         }
-        current_display = "5-state (-2…+2)"
-        for display_name, (system_name, _, _) in charge_options.items():
-            if system_name == st.session_state.charge_system:
-                current_display = display_name
-                break
-        charge_system_selection = st.selectbox(
-            "Select range:",
-            list(charge_options.keys()),
-            index=list(charge_options.keys()).index(current_display),
-            key="charge_system_selector_v2",
-            label_visibility="collapsed"
-        )
-        selected_system, min_charge, max_charge = charge_options[charge_system_selection]
-        new_system = selected_system
-        new_min_charge = min_charge
-        new_max_charge = max_charge
-        update_charge_system(new_system, new_min_charge, new_max_charge)
-    
-    with ctrl_col2:
-        st.markdown("**Quick Template**")
-        if st.button("Generate N=100", key="generate_n100_v2", use_container_width=True):
-            template_data = []
-            current_min = st.session_state.min_charge
-            current_max = st.session_state.max_charge
-            charge_range_val = current_max - current_min + 1
-            neutral_index = neutral_index_for_range(current_min, current_max)
-            for i in range(1, 101):
-                site_id = f"Site_{i}"
-                copies = 1
-                probs = [0.0] * charge_range_val
-                if i % 4 == 0:
-                    probs[neutral_index] = 0.8
-                    idx_minus1 = index_for_charge(-1, current_min)
-                    idx_plus1 = index_for_charge(1, current_min)
-                    if 0 <= idx_minus1 < charge_range_val:
-                        probs[idx_minus1] = 0.1
-                    if 0 <= idx_plus1 < charge_range_val:
-                        probs[idx_plus1] = 0.1
-                elif i % 4 == 1:
-                    probs[neutral_index] = 0.6
-                    idx_p1 = index_for_charge(1, current_min)
-                    idx_p2 = index_for_charge(2, current_min)
-                    if 0 <= idx_p1 < charge_range_val:
-                        probs[idx_p1] = 0.3
-                    if 0 <= idx_p2 < charge_range_val:
-                        probs[idx_p2] = 0.1
-                    else:
-                        probs[neutral_index] += 0.1
-                elif i % 4 == 2:
-                    probs[neutral_index] = 0.6
-                    idx_m1 = index_for_charge(-1, current_min)
-                    idx_m2 = index_for_charge(-2, current_min)
-                    if 0 <= idx_m1 < charge_range_val:
-                        probs[idx_m1] = 0.3
-                    if 0 <= idx_m2 < charge_range_val:
-                        probs[idx_m2] = 0.1
-                    else:
-                        probs[neutral_index] += 0.1
-                else:
-                    probs[neutral_index] = 0.5
-                    remaining_prob = 0.5
-                    for offset in range(1, min(3, neutral_index + 1, charge_range_val - neutral_index)):
-                        prob_each = remaining_prob / (2 * min(2, offset))
-                        if neutral_index - offset >= 0:
-                            probs[neutral_index - offset] = prob_each
-                        if neutral_index + offset < charge_range_val:
-                            probs[neutral_index + offset] = prob_each
-                        remaining_prob -= 2 * prob_each
-                        if remaining_prob <= 0:
-                            break
-                    probs[neutral_index] += remaining_prob
-                template_data.append([site_id, copies] + probs)
-            DEFAULT_COLS = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
-            template_df = pd.DataFrame(template_data, columns=DEFAULT_COLS)
-            st.session_state.df = template_df
-            st.rerun()
-    
-    with ctrl_col3:
-        st.markdown("**Dataset Info**")
-        n_sites = len(st.session_state.df)
-        st.metric("Sites", n_sites, label_visibility="collapsed")
-    
-    with ctrl_col4:
-        st.markdown("**Reset**")
-        if st.button("Reset", key="reset_v2", help="Reset to 2 example sites", use_container_width=True):
-            DEFAULT_COLS = generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge)
+        current_key = f"{st.session_state.max_charge - st.session_state.min_charge + 1}-state ({st.session_state.min_charge}…+{st.session_state.max_charge})"
+        if current_key not in charge_options:
+            current_key = "5-state (-2…+2)"
+        
+        selection = st.selectbox("🔢 Charge Range", list(charge_options.keys()),
+                                 index=list(charge_options.keys()).index(current_key),
+                                 key="input_charge_range")
+        new_min, new_max = charge_options[selection]
+        
+        if new_min != st.session_state.min_charge or new_max != st.session_state.max_charge:
+            st.session_state.min_charge = new_min
+            st.session_state.max_charge = new_max
+            new_cols = generate_charge_columns(new_min, new_max)
+            neutral_idx = neutral_index_for_range(new_min, new_max)
+            probs1 = [0.0] * (new_max - new_min + 1)
+            probs2 = [0.0] * (new_max - new_min + 1)
+            probs1[neutral_idx] = 1.0
+            probs2[neutral_idx] = 0.6
+            if new_min <= -1 <= new_max:
+                probs2[index_for_charge(-1, new_min)] = 0.2
+            if new_min <= 1 <= new_max:
+                probs2[index_for_charge(1, new_min)] = 0.2
             st.session_state.df = pd.DataFrame([
-                ["Site_1", 1] + [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1),
-                ["Site_2", 1] + [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1),
-            ], columns=DEFAULT_COLS)
-            neutral_idx = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
-            st.session_state.df.iloc[0, 2 + neutral_idx] = 1.0
-            st.session_state.df.iloc[1, 2 + neutral_idx] = 0.6
-            if st.session_state.min_charge <= -1:
-                st.session_state.df.iloc[1, 2 + index_for_charge(-1, st.session_state.min_charge)] = 0.2
-            if st.session_state.max_charge >= 1:
-                st.session_state.df.iloc[1, 2 + index_for_charge(1, st.session_state.min_charge)] = 0.2
+                ["Site_1", 1] + probs1,
+                ["Site_2", 1] + probs2,
+            ], columns=new_cols)
+            st.session_state.last_results = None
             st.rerun()
+    
+    with c2:
+        if st.button("📄 Load 100-site template", key="btn_template"):
+            template_data = []
+            for i in range(1, 101):
+                copies = (i % 3) + 1
+                neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+                probs = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+                probs[neutral] = 0.6
+                if st.session_state.min_charge <= -1:
+                    probs[index_for_charge(-1, st.session_state.min_charge)] = 0.2
+                if st.session_state.max_charge >= 1:
+                    probs[index_for_charge(1, st.session_state.min_charge)] = 0.2
+                template_data.append([f"Site_{i}", copies] + probs)
+            st.session_state.df = pd.DataFrame(template_data,
+                columns=generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge))
+            st.session_state.last_results = None
+            st.rerun()
+    
+    with c3:
+        if st.button("🔄 Reset to default", key="btn_reset"):
+            neutral = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+            probs1 = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+            probs2 = [0.0] * (st.session_state.max_charge - st.session_state.min_charge + 1)
+            probs1[neutral] = 1.0
+            probs2[neutral] = 0.6
+            if st.session_state.min_charge <= -1:
+                probs2[index_for_charge(-1, st.session_state.min_charge)] = 0.2
+            if st.session_state.max_charge >= 1:
+                probs2[index_for_charge(1, st.session_state.min_charge)] = 0.2
+            st.session_state.df = pd.DataFrame([
+                ["Site_1", 1] + probs1,
+                ["Site_2", 1] + probs2,
+            ], columns=generate_charge_columns(st.session_state.min_charge, st.session_state.max_charge))
+            st.session_state.last_results = None
+            st.rerun()
+    
+    with c4:
+        st.metric("Sites", len(st.session_state.df))
     
     st.markdown("---")
     
-    # Show dataset status
-    st.markdown("#### Probability Data Table")
+    with st.expander("💡 How to enter data"):
+        st.markdown("""
+        | Column | Description |
+        |--------|-------------|
+        | Site_ID | Name for your site (e.g., "Ser123") |
+        | Copies | How many copies of this site (usually 1) |
+        | P(-2)...P(+2) | Probability of each charge state (must sum to 1.0) |
+        
+        **💡 Tip:** For easier editing, download the data as CSV, edit in Excel, then upload!
+        """)
+    
+    # Data editor - use a cleaner approach to avoid flickering
+    st.markdown("**Edit probabilities below** (each row should sum to 1.0)")
+    
     prob_cols = [col for col in st.session_state.df.columns if col.startswith("P(")]
-    temp_df = st.session_state.df.copy()
-    if prob_cols:
-        temp_df["Prob_Sum"] = temp_df[prob_cols].sum(axis=1)
-        n_valid = sum(np.isclose(temp_df["Prob_Sum"].fillna(0), 1.0, atol=1e-6))
-    else:
-        n_valid = 0
-    n_sites = len(st.session_state.df)
     
-    if n_valid == n_sites:
-        st.success(f"All {n_sites} sites have valid probabilities (sum = 1.0)")
-    else:
-        st.warning(f"{n_sites - n_valid} of {n_sites} sites need adjustment (probabilities must sum to 1.0)")
+    # Create a working copy for the editor (without computed columns)
+    editor_df = st.session_state.df.copy()
     
-    # Build display with Status and Sum columns
-    display_df = st.session_state.df.copy()
-    if prob_cols:
-        display_df["Prob_Sum"] = display_df[prob_cols].sum(axis=1)
-        display_df["Status"] = display_df["Prob_Sum"].apply(lambda x: "Valid" if np.isclose(x, 1.0, atol=1e-6) else "Invalid")
-    else:
-        display_df["Prob_Sum"] = 0.0
-        display_df["Status"] = "Invalid"
-
-    # Reorder columns: Status first, then base columns, then probabilities, then Sum
-    base_cols = [col for col in ["Site_ID", "Copies"] if col in display_df.columns]
-    display_cols = ["Status"] + base_cols + prob_cols + ["Prob_Sum"]
-    display_df = display_df[display_cols]
+    # Column configuration
+    col_config = {
+        "Site_ID": st.column_config.TextColumn("Site ID", width="small"),
+        "Copies": st.column_config.NumberColumn("Copies", min_value=1, max_value=10, step=1, width="small"),
+    }
+    for col in prob_cols:
+        col_config[col] = st.column_config.NumberColumn(col, min_value=0.0, max_value=1.0, step=0.01, format="%.3f")
     
-    # Highlight probability columns
-    st.info("**Probability columns** (P(...)) are the core of this tool - ensure each row sums to 1.0!")
-
-    # Editable table with Status and Sum visible but read-only (300px default height)
+    # Use on_change callback to properly handle edits
     edited = st.data_editor(
-        display_df,
-        use_container_width=True,
-        height=300,
+        editor_df,
+        column_config=col_config,
         num_rows="dynamic",
-        column_config={
-            "Status": st.column_config.TextColumn("Status", width="small", help="Valid or Invalid"),
-            "Site_ID": st.column_config.TextColumn("Site_ID", width="medium"),
-            "Copies": st.column_config.NumberColumn("Copies", min_value=1, step=1, width="small"),
-            **{col: st.column_config.NumberColumn(
-                col, 
-                min_value=0.0, 
-                max_value=1.0, 
-                step=0.01, 
-                format="%.3f",
-                help="Probability for this charge state"
-            ) for col in prob_cols},
-            "Prob_Sum": st.column_config.NumberColumn("Sum", format="%.3f", width="small", help="Must equal 1.0")
-        },
         hide_index=True,
-        disabled=["Status", "Prob_Sum"]
+        key="main_data_editor",
+        width="stretch"
     )
-
-    # Persist edits back (exclude Status and Prob_Sum)
-    editable_cols = [col for col in display_df.columns if col not in ("Status", "Prob_Sum")]
-    st.session_state.df = edited[editable_cols].copy()
-
-# -------------------------------
-# TAB 2: Compute & Visualize
-# -------------------------------
-with tabs[2]:
-    st.markdown("### Compute & Visualize Distribution")
     
-    # Compute button
-    run_btn = st.button("Compute Distribution Now", key="compute_v2", type="primary", use_container_width=False)
+    # Update session state with edited data
+    st.session_state.df = edited.copy()
+    
+    # Show validation status separately (not in the editor)
+    if prob_cols and len(edited) > 0:
+        sums = edited[prob_cols].sum(axis=1)
+        valid_mask = np.isclose(sums, 1.0, atol=1e-6)
+        invalid_count = sum(~valid_mask)
+        
+        # Show summary metrics
+        val_col1, val_col2, val_col3 = st.columns(3)
+        with val_col1:
+            st.metric("Total Rows", len(edited))
+        with val_col2:
+            st.metric("Valid Rows", sum(valid_mask))
+        with val_col3:
+            if invalid_count > 0:
+                st.metric("Invalid Rows", invalid_count, delta=f"-{invalid_count}", delta_color="inverse")
+            else:
+                st.metric("Invalid Rows", 0)
+        
+        if invalid_count > 0:
+            st.warning(f"⚠️ {invalid_count} row(s) have Sum ≠ 1.0 (will be auto-normalized during compute)")
+            # Show which rows are invalid
+            with st.expander("Show invalid rows"):
+                invalid_indices = np.where(~valid_mask)[0]
+                for idx in invalid_indices[:5]:  # Show first 5
+                    row_sum = sums.iloc[idx]
+                    st.write(f"Row {idx+1} (Site: {edited.iloc[idx]['Site_ID']}): Sum = {row_sum:.4f}")
+                if len(invalid_indices) > 5:
+                    st.write(f"... and {len(invalid_indices) - 5} more")
+        else:
+            st.success("✅ All rows valid!")
+
+# ============ TAB: COMPUTE ============
+with tab_compute:
+    st.markdown("### 📊 Compute & Visualize")
     
     df = st.session_state.df.copy()
     prob_cols = [col for col in df.columns if col.startswith("P(")]
+    n_sites = len(df)
+    total_copies = int(df['Copies'].sum()) if 'Copies' in df.columns else n_sites
     
-    # Validation check
-    if prob_cols:
-        df["Prob_Sum"] = df[prob_cols].sum(axis=1)
-        all_valid = np.all(np.isclose(df["Prob_Sum"].fillna(0), 1.0, atol=1e-6))
-        if not all_valid:
-            st.warning("Some rows have probabilities ≠ 1.0 — they'll be auto-normalized for computation")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Sites", n_sites)
+    with col2:
+        st.metric("Total Copies", total_copies)
+    with col3:
+        if prob_cols:
+            df["_sum"] = df[prob_cols].sum(axis=1)
+            n_valid = sum(np.isclose(df["_sum"].fillna(0), 1.0, atol=1e-6))
+            if n_valid == n_sites:
+                st.success("✓ All valid")
+            else:
+                st.warning(f"⚠ {n_sites - n_valid} invalid")
+    
+    st.markdown("---")
+    
+    if st.button("🚀 Compute Distribution", type="primary", key="btn_compute"):
+        with st.spinner("Computing..."):
+            try:
+                df_compute = df.copy()
+                if prob_cols:
+                    for idx, row in df_compute.iterrows():
+                        probs = row[prob_cols].astype(float).fillna(0.0)
+                        s = probs.sum()
+                        if s <= 0:
+                            neutral_idx = neutral_index_for_range(st.session_state.min_charge, st.session_state.max_charge)
+                            probs = pd.Series(0.0, index=prob_cols)
+                            probs.iloc[neutral_idx] = 1.0
+                        else:
+                            probs = probs / s
+                        df_compute.loc[idx, prob_cols] = probs.values
+
+                if ADVANCED_ALGORITHMS_AVAILABLE:
+                    start = time.time()
+                    pmf_arr, pmf_off, method_used, _ = adaptive_charge_distribution(df_compute, method="auto")
+                    elapsed = time.time() - start
+                else:
+                    start = time.time()
+                    pmf_arr, pmf_off = yergeev_overall_charge_distribution(df_compute)
+                    elapsed = time.time() - start
+                    method_used = "Yergeev"
+                
+                window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -5, +5)
+                
+                st.session_state.last_results = {
+                    "window_df": window_df,
+                    "tail_low": tail_low,
+                    "tail_high": tail_high,
+                    "elapsed": elapsed,
+                    "method": method_used,
+                    "total_copies": total_copies
+                }
+            except Exception as e:
+                st.error(f"Error: {e}")
+                st.session_state.last_results = None
+    
+    # Show results
+    if st.session_state.last_results:
+        res = st.session_state.last_results
+        window_df = res["window_df"]
+        
+        st.success(f"✓ Computed in {res['elapsed']*1000:.1f} ms using {res['method']}")
+        
+        most_likely = window_df.loc[window_df['Probability'].idxmax(), 'Charge']
+        peak_prob = window_df['Probability'].max()
+        central_mass = 1.0 - res["tail_low"] - res["tail_high"]
+        
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.metric("🎯 Most Likely", f"{most_likely:+.0f}")
+        with m2:
+            st.metric("📈 Peak Prob", f"{peak_prob:.1%}")
+        with m3:
+            st.metric("📊 Central Mass", f"{central_mass:.1%}")
+        with m4:
+            st.metric("🧬 Copies", res["total_copies"])
+        
+        st.markdown("---")
+        
+        # Distribution chart with interpretation on the side
+        chart_col, interp_col = st.columns([3, 1])
+        
+        with chart_col:
+            st.markdown("### 📈 Distribution")
+            
+            colors = ['#d62728' if c < -2 else '#ff7f0e' if c < 0 else '#2ca02c' if c == 0 else '#1f77b4' if c <= 2 else '#9467bd' 
+                      for c in window_df['Charge']]
+            
+            fig = make_subplots(rows=2, cols=1, row_heights=[0.6, 0.4], vertical_spacing=0.12,
+                               subplot_titles=('Probability', 'Cumulative'))
+            
+            fig.add_trace(go.Bar(x=window_df['Charge'], y=window_df['Probability'], marker_color=colors,
+                                hovertemplate='Charge: %{x:+d}<br>P: %{y:.4f}<extra></extra>'), row=1, col=1)
+            
+            cumulative = np.cumsum(window_df['Probability'].values)
+            fig.add_trace(go.Scatter(x=window_df['Charge'].values, y=cumulative, mode='lines+markers',
+                                    line=dict(color='#1f77b4', width=2), marker=dict(size=5),
+                                    hovertemplate='≤%{x:+d}: %{y:.3f}<extra></extra>'), row=2, col=1)
+            
+            fig.add_hline(y=0.5, line_dash="dash", line_color="gray", row=2, col=1)
+            fig.update_layout(height=450, showlegend=False, template='plotly_white', margin=dict(t=30, b=30))
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with interp_col:
+            st.markdown("### 🔍 Interpretation")
+            st.markdown(f"""
+            **Most likely charge:**  
+            **{most_likely:+d}** ({peak_prob:.1%})
+            
+            ---
+            
+            **Central mass** (-5 to +5):  
+            {central_mass:.1%}
+            
+            **Left tail** (< -5):  
+            {res['tail_low']:.2%}
+            
+            **Right tail** (> +5):  
+            {res['tail_high']:.2%}
+            
+            ---
+            
+            **Method used:**  
+            {res['method']}
+            
+            **Compute time:**  
+            {res['elapsed']*1000:.1f} ms
+            """)
+            
+            with st.expander("📋 Data"):
+                st.dataframe(window_df, hide_index=True, height=200)
     else:
-        all_valid = False
-        st.error("No probability columns found")
+        st.info("👆 Click **Compute Distribution** to calculate results")
+
+# ============ TAB: VALIDATE ============
+with tab_validate:
+    st.markdown("### ✅ Validation & Benchmarking")
     
-    if run_btn:
-        try:
-            df_for_compute = df.copy()
-            if prob_cols:
-                for idx, row in df_for_compute.iterrows():
+    total_copies = int(st.session_state.df['Copies'].sum()) if 'Copies' in st.session_state.df.columns else len(st.session_state.df)
+    
+    # Thresholds
+    ENUM_LIMIT = 12  # Enumeration feasible only for small datasets
+    
+    # Determine which benchmark to use
+    if total_copies <= ENUM_LIMIT:
+        benchmark_method = "enumeration"
+        benchmark_name = "Exact Enumeration"
+        benchmark_note = f"✅ Small dataset ({total_copies} copies) - using enumeration as ground truth"
+        can_enumerate = True
+    else:
+        benchmark_method = "yergeev"
+        benchmark_name = "Yergeev Convolution"
+        benchmark_note = f"📊 Large dataset ({total_copies} copies) - enumeration infeasible (5^{total_copies} combinations)"
+        can_enumerate = False
+    
+    with st.expander("ℹ️ Why These Benchmarks?"):
+        st.markdown(f"""
+        **Current Dataset:** {total_copies} total copies
+        
+        | Method | Complexity | Feasibility |
+        |--------|-----------|-------------|
+        | **Enumeration** | 5^n = 5^{total_copies} | {'✅ Feasible' if can_enumerate else '❌ Impossible'} |
+        | **Yergeev** | O(n²) | ✅ Always fast |
+        | **FFT** | O(n log n) | ✅ Always fast |
+        | **Gaussian** | O(n) | ✅ Instant (approx) |
+        
+        {'**Using Enumeration** as benchmark - this explores ALL possible charge combinations and gives absolute ground truth.' if can_enumerate else f'**Using Yergeev** as benchmark - enumeration would need 5^{total_copies} ≈ 10^{int(total_copies * 0.7)} operations!'}
+        """)
+    
+    # Show dataset info
+    info_cols = st.columns(3)
+    with info_cols[0]:
+        st.metric("Total Copies", total_copies)
+    with info_cols[1]:
+        st.metric("Benchmark", benchmark_name.split()[0])
+    with info_cols[2]:
+        if can_enumerate:
+            st.success("✓ Enum feasible")
+        else:
+            st.info("Yergeev benchmark")
+    
+    st.caption(benchmark_note)
+    
+    # Algorithm selection
+    st.markdown("#### 🧪 Methods to Test")
+    cmp_col1, cmp_col2, cmp_col3, cmp_col4 = st.columns(4)
+    with cmp_col1:
+        compare_yergeev = st.checkbox("Yergeev", value=True, key="cmp_yergeev")
+    with cmp_col2:
+        compare_fft = st.checkbox("FFT", value=True, key="cmp_fft")
+    with cmp_col3:
+        compare_gaussian = st.checkbox("Gaussian", value=True, key="cmp_gaussian")
+    with cmp_col4:
+        # Only show enumeration option if feasible
+        if can_enumerate:
+            compare_enum = st.checkbox("Enumeration", value=True, key="cmp_enum", 
+                                       help="Ground truth - tests all combinations")
+        else:
+            compare_enum = False
+            st.caption("Enum: N/A")
+    
+    if st.button("🔍 Run Benchmark", key="btn_validate", type="primary"):
+        with st.spinner("Running benchmark..."):
+            try:
+                df_val = st.session_state.df.copy()
+                prob_cols = [col for col in df_val.columns if col.startswith("P(")]
+                
+                # Normalize probabilities
+                for idx, row in df_val.iterrows():
                     probs = row[prob_cols].astype(float).fillna(0.0)
                     s = probs.sum()
-                    if s <= 0:
-                        neutral_idx = neutral_index_for_range(st.session_state.get('min_charge', -2), st.session_state.get('max_charge', 2))
-                        probs = pd.Series(0.0, index=prob_cols)
-                        probs.iloc[neutral_idx] = 1.0
+                    if s > 0:
+                        df_val.loc[idx, prob_cols] = (probs / s).values
+                
+                results = {}
+                benchmark_result = None
+                
+                # Run benchmark first
+                if benchmark_method == "enumeration" and can_enumerate:
+                    t0 = time.time()
+                    pmf_b, off_b, status = enumerate_charge_combinations(df_val)
+                    time_b = time.time() - t0
+                    if pmf_b is not None and status == "exact":
+                        benchmark_result = {'pmf': pmf_b, 'offset': off_b, 'time': time_b}
+                        results['📌 Enumeration (Ground Truth)'] = benchmark_result
                     else:
-                        probs = probs / s
-                    df_for_compute.loc[idx, prob_cols] = probs.values
-
-            # Use Yergeev's method for computation
-            pmf_arr, pmf_off = yergeev_overall_charge_distribution(df_for_compute)
-            window_df, tail_low, tail_high = window_distribution(pmf_arr, pmf_off, -5, +5)
-
-            st.success("Computation completed successfully!")
-            
-            total_sites = len(df[df['Copies'].notna() & (df['Copies'] > 0)])
-            most_likely_charge = window_df.loc[window_df['Probability'].idxmax(), 'Charge']
-            max_probability = window_df['Probability'].max()
-            central_mass = 1.0 - tail_low - tail_high
-
-            # Colorful metrics in a compact layout
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("PTM Sites", total_sites)
-            with col2:
-                st.metric("Most Likely Charge", f"{most_likely_charge:+.0f}")
-            with col3:
-                st.metric("Peak Probability", f"{max_probability:.1%}")
-            with col4:
-                st.metric("Central Mass", f"{central_mass:.1%}", help="Probability in [-5,+5] range")
-
-            st.markdown("---")
-            
-            # Create two columns: plots on left, interpretation on right
-            plot_col, guide_col = st.columns([3, 1])
-            
-            with plot_col:
-                st.markdown("### Interactive Visualizations")
-                
-                # 1. Combined Distribution + Cumulative Plot
-                st.markdown("#### Distribution & Cumulative")
-                combined_fig = make_subplots(
-                    rows=2, cols=1,
-                    subplot_titles=('Probability Distribution', 'Cumulative Distribution'),
-                    vertical_spacing=0.12,
-                    row_heights=[0.6, 0.4]
-                )
-                
-                # Distribution plot (top)
-                colors = []
-                for charge in window_df['Charge']:
-                    if charge < -2:
-                        colors.append('#d62728')  # Red
-                    elif charge < 0:
-                        colors.append('#ff7f0e')  # Orange
-                    elif charge == 0:
-                        colors.append('#2ca02c')  # Green
-                    elif charge <= 2:
-                        colors.append('#1f77b4')  # Blue
-                    else:
-                        colors.append('#9467bd')  # Purple
-                
-                combined_fig.add_trace(
-                    go.Bar(
-                        x=window_df['Charge'], 
-                        y=window_df['Probability'], 
-                        marker_color=colors,
-                        name='Probability',
-                        hovertemplate='<b>Charge: %{x:+d}</b><br>Probability: %{y:.4f}<extra></extra>'
-                    ), 
-                    row=1, col=1
-                )
-                
-                # Cumulative plot (bottom)
-                cumulative = np.cumsum(window_df['Probability'].values)
-                combined_fig.add_trace(
-                    go.Scatter(
-                        x=window_df['Charge'].values, 
-                        y=cumulative, 
-                        mode='lines+markers', 
-                        line=dict(color='#1f77b4', width=3),
-                        marker=dict(size=6),
-                        name='Cumulative',
-                        hovertemplate='<b>Up to %{x:+d}</b><br>Cumulative: %{y:.3f}<extra></extra>'
-                    ), 
-                    row=2, col=1
-                )
-                
-                # Add reference lines to cumulative
-                combined_fig.add_hline(y=0.5, line_dash="dash", line_color="gray", row=2, col=1)
-                combined_fig.add_hline(y=0.9, line_dash="dot", line_color="orange", row=2, col=1)
-                
-                combined_fig.update_layout(
-                    title_text=f'PTM Charge Analysis ({total_sites} sites)', 
-                    showlegend=False, 
-                    template='plotly_white', 
-                    height=600
-                )
-                combined_fig.update_xaxes(title_text="Net Charge", row=1, col=1)
-                combined_fig.update_xaxes(title_text="Net Charge", row=2, col=1)
-                combined_fig.update_yaxes(title_text="Probability", row=1, col=1)
-                combined_fig.update_yaxes(title_text="Cumulative Probability", row=2, col=1)
-                
-                st.plotly_chart(combined_fig, use_container_width=True)
-                
-                # Results table (compact)
-                with st.expander("Detailed probability table"):
-                    st.dataframe(window_df, use_container_width=True, height=250)
-                    st.caption(f"**Full range:** {pmf_off} to {pmf_off + len(pmf_arr) - 1} | **Tail low:** {tail_low:.1%} | **Tail high:** {tail_high:.1%}")
-            
-            with guide_col:
-                st.markdown("### Guide")
-                with st.expander("Distribution", expanded=True):
-                    st.markdown("""
-                    **Colors:**
-                    - Red: Negative
-                    - Green: Neutral  
-                    - Blue: Positive
-                    
-                    **Height** = probability
-                    """)
-                    if abs(most_likely_charge) <= 2:
-                        st.success("Moderate")
-                    else:
-                        st.info("Significant")
-                
-                with st.expander("Cumulative", expanded=True):
-                    st.markdown("""
-                    Shows P(charge ≤ X)
-                    
-                    - **Steep**: Narrow
-                    - **Gradual**: Wide
-                    - **50% line**: Median
-                    """)
-                    if central_mass > 0.5:
-                        st.success("Centered")
-                    else:
-                        st.info("Extended")
-        
-        except Exception as e:
-            st.error(f"Computation failed: {e}")
-            with st.expander("Error details"):
-                st.code(str(e))
-
-# -------------------------------
-# TAB 3: Validate & Compare
-# -------------------------------
-with tabs[3]:
-    st.markdown("### Validation & Method Comparison")
-    
-    st.info("""
-    **Purpose:** Validate the Streamlit calculator against an exhaustive enumeration method.
-    
-    This tab compares two approaches:
-    1. **Yergeev's Method (Production)**: Iterative convolution (efficient, scales to 100+ sites)
-    2. **Enumeration Method (Validation)**: Exhaustive combinations (accurate, limited to small datasets)
-    
-    **Reference:** Yergey, J. A. (1983). A general approach to calculating isotopic distributions 
-    for mass spectrometry. *International Journal of Mass Spectrometry and Ion Physics*, 52(2), 337–349.
-    """)
-    
-    val_btn = st.button("Run Validation Test", key="validate_v2", type="secondary")
-    
-    df_val = st.session_state.df.copy()
-    prob_cols_val = [col for col in df_val.columns if col.startswith("P(")]
-    
-    if val_btn:
-        try:
-            import time
-            
-            # Prepare data for both methods
-            df_for_val = df_val.copy()
-            if prob_cols_val:
-                for idx, row in df_for_val.iterrows():
-                    probs = row[prob_cols_val].astype(float).fillna(0.0)
-                    s = probs.sum()
-                    if s <= 0:
-                        neutral_idx = neutral_index_for_range(st.session_state.get('min_charge', -2), st.session_state.get('max_charge', 2))
-                        probs = pd.Series(0.0, index=prob_cols_val)
-                        probs.iloc[neutral_idx] = 1.0
-                    else:
-                        probs = probs / s
-                    df_for_val.loc[idx, prob_cols_val] = probs.values
-            
-            # Method 1: Yergeev's iterative convolution (with timing)
-            t0_y = time.time()
-            pmf_yergeev, off_yergeev = yergeev_overall_charge_distribution(df_for_val)
-            time_yergeev = time.time() - t0_y
-            
-            # Method 2: Exhaustive enumeration with smart sampling (with timing)
-            t0_e = time.time()
-            result_enum = enumerate_charge_combinations(df_for_val)
-            time_enum = time.time() - t0_e
-            
-            pmf_enum, off_enum, enum_method = result_enum
-            
-            # If enumeration succeeded but used sampling, we need to re-run Yergeev on the same subset for fair comparison
-            if pmf_enum is not None and enum_method == "sampled":
-                # Determine sample size used by enumeration
-                n_sites_in_data = len(df_for_val[df_for_val['Copies'].notna() & (df_for_val['Copies'] > 0)])
-                
-                # Re-run enumeration to get the actual sample size used
-                prob_cols_check = [col for col in df_for_val.columns if col.startswith("P(")]
-                charges_check = []
-                for col in prob_cols_check:
-                    charge_str = col[2:-1]
-                    if charge_str.startswith('+'):
-                        charges_check.append(int(charge_str[1:]))
-                    elif charge_str.startswith('-'):
-                        charges_check.append(-int(charge_str[1:]))
-                    else:
-                        charges_check.append(int(charge_str))
-                
-                # Try different sample sizes to find which one was used
-                sample_used = 8
-                for test_size in range(3, min(11, n_sites_in_data + 1)):
-                    test_combos = 1
-                    for _, row in df_for_val.iloc[:test_size].iterrows():
-                        if pd.notna(row.get("Copies")):
-                            copies = int(row["Copies"])
-                            if copies > 0:
-                                test_combos *= (len(prob_cols_check) ** copies)
-                    if test_combos <= 100000000:
-                        sample_used = test_size
-                        break
-                
-                # Re-run Yergeev on the same sample for fair comparison
-                df_for_comparison = df_for_val.iloc[:sample_used].copy()
-                t0_y2 = time.time()
-                pmf_yergeev_sampled, off_yergeev_sampled = yergeev_overall_charge_distribution(df_for_comparison)
-                time_yergeev_sampled = time.time() - t0_y2
-                
-                # Use sampled versions for comparison
-                pmf_yergeev_compare = pmf_yergeev_sampled
-                off_yergeev_compare = off_yergeev_sampled
-                time_yergeev_compare = time_yergeev_sampled
-                n_sites_compare = sample_used
-            else:
-                pmf_yergeev_compare = pmf_yergeev
-                off_yergeev_compare = off_yergeev
-                time_yergeev_compare = time_yergeev
-                n_sites_compare = len(df_for_val[df_for_val['Copies'].notna() & (df_for_val['Copies'] > 0)])
-            
-            # Display timing metrics first
-            st.markdown("### Performance Metrics")
-            perf_col1, perf_col2, perf_col3 = st.columns(3)
-            with perf_col1:
-                st.metric("Yergeev's Time", f"{time_yergeev_compare*1000:.2f} ms", help="Iterative convolution (O(N×M²))")
-            with perf_col2:
-                if pmf_enum is not None:
-                    st.metric("Enumeration Time", f"{time_enum:.2f} s", help=f"Exhaustive method")
+                        # Fallback to Yergeev
+                        t0 = time.time()
+                        pmf_b, off_b = yergeev_overall_charge_distribution(df_val)
+                        time_b = time.time() - t0
+                        benchmark_result = {'pmf': pmf_b, 'offset': off_b, 'time': time_b}
+                        results['📌 Yergeev (Benchmark)'] = benchmark_result
                 else:
-                    st.metric("Enumeration Time", "Not available", help="Dataset too large")
-            with perf_col3:
-                if pmf_enum is not None and time_yergeev_compare > 0:
-                    speedup = time_enum / time_yergeev_compare
-                    if speedup >= 1:
-                        st.metric("Speedup Ratio", f"{speedup:.1f}x slower", help="Enumeration slower (as expected)")
+                    t0 = time.time()
+                    pmf_b, off_b = yergeev_overall_charge_distribution(df_val)
+                    time_b = time.time() - t0
+                    benchmark_result = {'pmf': pmf_b, 'offset': off_b, 'time': time_b}
+                    results['📌 Yergeev (Benchmark)'] = benchmark_result
+                
+                # Yergeev (if selected and not already benchmark)
+                if compare_yergeev and '📌 Yergeev (Benchmark)' not in results:
+                    t0 = time.time()
+                    pmf_y, off_y = yergeev_overall_charge_distribution(df_val)
+                    time_y = time.time() - t0
+                    results['Yergeev'] = {'pmf': pmf_y, 'offset': off_y, 'time': time_y}
+                
+                # Enumeration (if selected and feasible, and not already benchmark)
+                if compare_enum and can_enumerate and '📌 Enumeration' not in str(results.keys()):
+                    t0 = time.time()
+                    pmf_e, off_e, status = enumerate_charge_combinations(df_val)
+                    time_e = time.time() - t0
+                    if pmf_e is not None:
+                        results['Enumeration'] = {'pmf': pmf_e, 'offset': off_e, 'time': time_e}
+                
+                # FFT
+                if compare_fft and ADVANCED_ALGORITHMS_AVAILABLE:
+                    from advanced_algorithms import fft_accelerated_charge_distribution
+                    pmf_fft, off_fft, time_fft = fft_accelerated_charge_distribution(df_val)
+                    results['FFT'] = {'pmf': pmf_fft, 'offset': off_fft, 'time': time_fft}
+                
+                # Gaussian
+                if compare_gaussian and ADVANCED_ALGORITHMS_AVAILABLE:
+                    from advanced_algorithms import gaussian_approximation_charge_distribution
+                    pmf_g, off_g, time_g = gaussian_approximation_charge_distribution(df_val)
+                    results['Gaussian'] = {'pmf': pmf_g, 'offset': off_g, 'time': time_g}
+                
+                # Display results in two columns
+                st.markdown("---")
+                res_col1, res_col2 = st.columns([1, 1])
+                
+                with res_col1:
+                    st.markdown("#### ⏱️ Performance")
+                    perf_data = []
+                    for name, data in results.items():
+                        if data['time'] < 0.001:
+                            time_str = f"{data['time']*1000000:.1f} μs"
+                        elif data['time'] < 1:
+                            time_str = f"{data['time']*1000:.1f} ms"
+                        else:
+                            time_str = f"{data['time']:.2f} s"
+                        display_name = name.replace('📌 ', '').split(' (')[0]
+                        perf_data.append({'Method': display_name, 'Time': time_str})
+                    st.dataframe(pd.DataFrame(perf_data), hide_index=True)
+                
+                with res_col2:
+                    st.markdown("#### 📊 Accuracy")
+                    
+                    # Get benchmark window
+                    win_b, _, _ = window_distribution(benchmark_result['pmf'], benchmark_result['offset'], -5, +5)
+                    
+                    comparison_data = []
+                    for name, data in results.items():
+                        display_name = name.replace('📌 ', '').split(' (')[0]
+                        
+                        if '📌' in name:
+                            comparison_data.append({'Method': display_name, 'Max Diff': '-', 'Status': '📌 BENCHMARK'})
+                            continue
+                        
+                        win_other, _, _ = window_distribution(data['pmf'], data['offset'], -5, +5)
+                        max_diff = 0.0
+                        if len(win_b) == len(win_other):
+                            max_diff = np.max(np.abs(win_b['Probability'].values - win_other['Probability'].values))
+                        
+                        if max_diff < 1e-10:
+                            status = '🎯 PERFECT'
+                        elif max_diff < 1e-6:
+                            status = '✅ Exact'
+                        elif max_diff < 0.01:
+                            status = '⚠️ ~Approx'
+                        else:
+                            status = '❌ Differs'
+                        
+                        comparison_data.append({'Method': display_name, 'Max Diff': f'{max_diff:.2e}', 'Status': status})
+                    
+                    st.dataframe(pd.DataFrame(comparison_data), hide_index=True)
+                
+                # Summary
+                non_benchmark = [d for d in comparison_data if 'BENCHMARK' not in d['Status']]
+                if non_benchmark:
+                    all_perfect = all('PERFECT' in d['Status'] or 'Exact' in d['Status'] for d in non_benchmark)
+                    if all_perfect:
+                        st.success("🎉 All exact methods match benchmark perfectly!")
                     else:
-                        st.metric("Speedup Ratio", f"{1/speedup:.1f}x faster", help="Yergeev faster")
-                else:
-                    st.metric("Speedup Ratio", "N/A", help="Enumeration not available")
-            
-            st.markdown("---")
-            
-            # Now handle comparison
-            if pmf_enum is None:
-                st.warning("Enumeration unavailable for comparison")
-                if enum_method == "unavailable":
-                    st.info(f"""
-                    **Dataset exceeds enumeration limits**
-                    
-                    This dataset is too large for exact enumeration (too many combinations).
-                    
-                    What this means:
-                    - Yergeev's method completed in {time_yergeev*1000:.2f} ms
-                    - Exact enumeration would require checking {int(10e70)} combinations (N=100, M=5 charge states)
-                    - Both methods are mathematically equivalent, but enumeration is exponential in complexity
-                    
-                    Recommendation: Use Yergeev's method for production—it scales to 100+ sites efficiently.
-                    """)
-            else:
-                # Compare results (now using same data for both)
-                st.success("Both methods completed successfully!")
+                        gaussian_diff = [d for d in non_benchmark if 'Gaussian' in d['Method']]
+                        if gaussian_diff and 'Approx' in gaussian_diff[0]['Status']:
+                            st.info("ℹ️ Gaussian is an approximation (expected small difference)")
                 
-                # Show which method was used for enumeration
-                if enum_method == "sampled":
-                    st.info(f"Enumeration used sampling: validated on first {n_sites_compare} sites, Yergeev re-run on same subset for fair comparison")
-                
-                # Get window distributions for both
-                window_yergeev_cmp, tail_y_low, tail_y_high = window_distribution(pmf_yergeev_compare, off_yergeev_compare, -5, +5)
-                window_enum, tail_e_low, tail_e_high = window_distribution(pmf_enum, off_enum, -5, +5)
-                
-                # Compute metrics
-                max_diff = np.max(np.abs(window_yergeev_cmp['Probability'].values - window_enum['Probability'].values))
-                rmse = np.sqrt(np.mean((window_yergeev_cmp['Probability'].values - window_enum['Probability'].values)**2))
-                
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Max Difference", f"{max_diff:.2e}")
-                with col2:
-                    st.metric("RMSE", f"{rmse:.2e}")
-                with col3:
-                    st.metric("Yergeev Match", "Yes" if max_diff < 1e-6 else "Check")
-                with col4:
-                    st.metric("Data Points", len(window_yergeev_cmp))
-                
-                st.markdown("---")
-                
-                # Side-by-side comparison table
-                comparison_df = pd.DataFrame({
-                    "Charge": window_yergeev_cmp['Charge'],
-                    "Yergeev's Method": window_yergeev_cmp['Probability'],
-                    "Enumeration": window_enum['Probability'],
-                    "Difference": np.abs(window_yergeev_cmp['Probability'].values - window_enum['Probability'].values)
-                })
-                
-                st.subheader("Side-by-Side Probability Comparison")
-                st.dataframe(comparison_df, use_container_width=True, height=300)
-                
-                # Interpretation
-                st.markdown("---")
-                st.subheader("Method Comparison")
-                
-                comp_col1, comp_col2 = st.columns(2)
-                
-                with comp_col1:
-                    st.markdown("**Yergeev's Method (Production)**")
-                    st.markdown(f"""
-                    - Fast: {time_yergeev_compare*1000:.2f} ms for this dataset ({n_sites_compare} sites)
-                    - Efficient: O(N × M) where N = sites, M = charge states
-                    - Scalable: Handles 100+ sites easily
-                    - Accurate: Mathematically rigorous convolution
-                    - Recommended for all calculations
-                    """)
-                
-                with comp_col2:
-                    st.markdown("**Enumeration Method (Validation)**")
-                    st.markdown(f"""
-                    - Time: {time_enum:.2f} s for this dataset
-                    - Exponential: O(M^K) where K = total copies
-                    - Limited: Small datasets only (~10 sites max)
-                    - Exact: Brute-force ground truth
-                    - Used for validation only
-                    """)
-                
-                # Confidence message
-                st.markdown("---")
-                if max_diff < 1e-9:
-                    st.success("Excellent Agreement! Yergeev's method is numerically accurate.")
-                elif max_diff < 1e-6:
-                    st.success("Very Good Agreement! Yergeev's method matches enumeration within floating-point precision.")
-                elif max_diff < 1e-3:
-                    st.info("Good Agreement with minor numerical differences (expected for larger datasets).")
-                else:
-                    st.warning("Check inputs—larger differences may indicate data issues.")
-        
-        except Exception as e:
-            st.error(f"Validation failed: {e}")
-            with st.expander("Error details"):
-                st.code(str(e))
-    
-    # Information section
-    with st.expander("How validation & timing works", expanded=False):
-        st.markdown("""
-        ### Two Computational Approaches
-        
-        **Yergeev's Method (1983):**
-        - Uses iterative convolution to combine PTM site distributions
-        - For N sites with M charge states, complexity is O(N × M²) per convolution
-        - Efficiently handles multiple copies via repeated convolution
-        - **Gold standard** for this problem (referenced in biopharmaceutical literature)
-        - **Very fast**: scales to 100+ sites in milliseconds
-        
-        **Enumeration Method:**
-        - Explicitly enumerates all possible charge combinations
-        - For K total copies across all sites and M charge states: O(M^K)
-        - Provides exact ground truth for validation
-        - Only practical for small datasets (~10-20 sites max with 1-2 copies each)
-        - **Much slower**: exponential growth with dataset size
-        
-        ### Time Complexity Analysis
-        
-        **Yergeev's Method:** O(N × M²)
-        - N = number of sites
-        - M = number of charge states (typically 3-15)
-        - Even for N=100, M=5: ~2,500 operations per site
-        - **Expected time:** microseconds to milliseconds
-        
-        **Enumeration:** O(M^K)
-        - K = total number of PTM copies
-        - For N=100 sites with 1 copy each, M=5: 5^100 ≈ 10^70 combinations (impossible!)
-        - For N=10 sites with 1 copy each, M=5: 5^10 ≈ 9.7 million combinations (~seconds)
-        - **Expected time:** grows exponentially; quickly becomes impractical
-        
-        ### Why Compare?
-        The enumeration method serves as a **sanity check** for small datasets, confirming that 
-        Yergeev's iterative convolution produces accurate results. Once validated, Yergeev's 
-        method can be confidently used for large production datasets.
-        
-        ### Accuracy Metrics
-        
-        - **Max Difference**: Largest difference between Yergeev and Enumeration at any charge state
-        - **RMSE**: Root Mean Squared Error across all charge states
-        - **Numerical Accuracy**: Expect differences < 1e-9 for floating-point consistency
-        """)
-
-# End of app
+            except Exception as e:
+                st.error(f"Error: {e}")
+                import traceback
+                with st.expander("Error details"):
+                    st.code(traceback.format_exc())

@@ -59,5 +59,10 @@ if (Test-Path 'requirements.txt') {
 
 Write-Output "== Done. To run the app:"
 Write-Output "1) Activate the venv in PowerShell (optional but recommended): .\\.venv\\Scripts\\Activate.ps1"
-Write-Output "2) Run: streamlit run ptm_charge_input.py"
+Write-Output "2) Run: streamlit run ptm_charge_input_v2.py"
+Write-Output ""
+Write-Output "Or just run: run_protonpulse.ps1"
+Write-Output ""
 Write-Output "If activation is blocked by execution policy, run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
+Write-Output ""
+Read-Host "Press Enter to close"

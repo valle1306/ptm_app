@@ -61,5 +61,12 @@ htmlcov/
 *.xlsx
 *.xls
 
-# Keep sample data but ignore exports
-!sample_ptm_n100.csv
+# Keep sample data
+!Data/sample_ptm_n100.csv
+!Data/test_csvs/*.csv
+
+# Large image files (use external hosting)
+*.jpg
+*.jpeg
+*.png
+*.gif
