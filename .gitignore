@@ -80,5 +80,6 @@ htmlcov/
 !INSTALL/assets/protonpulse_logo.png
 !INSTALL/assets/protonpulse_logo.ico
 
-# Personal presentation materials (reference only)
+# Personal materials
 presentations/
+docs/
